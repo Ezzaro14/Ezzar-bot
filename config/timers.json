@@ -1,0 +1,75 @@
+{
+  "serverTimezone": "Asia/Seoul",
+  "categories": {
+    "boss": "Field Bosses",
+    "reset": "Resets"
+  },
+  "timers": [
+    {
+      "id": "daily-reset",
+      "name": "Daily Reset",
+      "category": "reset",
+      "type": "daily",
+      "time": "05:00"
+    },
+    {
+      "id": "weekly-reset",
+      "name": "Weekly Reset",
+      "category": "reset",
+      "type": "weekly",
+      "days": ["Wed"],
+      "time": "05:00"
+    },
+    {
+      "id": "executor-argo",
+      "name": "Executor Argo",
+      "category": "boss",
+      "type": "weekly",
+      "days": ["Mon", "Thu", "Sat"],
+      "time": "21:30",
+      "location": "Siel's Heart"
+    },
+    {
+      "id": "executor-tamasa",
+      "name": "Executor Tamasa",
+      "category": "boss",
+      "type": "weekly",
+      "days": ["Mon", "Thu", "Sat"],
+      "time": "21:30",
+      "location": "Reshanta's Root"
+    },
+    {
+      "id": "executor-kaira",
+      "name": "Executor Kaira",
+      "category": "boss",
+      "type": "weekly",
+      "days": ["Mon", "Thu", "Sat"],
+      "time": "21:30",
+      "location": "Sulfur Tree Island"
+    },
+    {
+      "id": "executioner-dramos",
+      "name": "Executioner Dramos",
+      "category": "boss",
+      "type": "weekly",
+      "days": ["Mon", "Thu", "Sat"],
+      "time": "21:30"
+    },
+    {
+      "id": "ravager-marakha",
+      "name": "Ravager Marakha",
+      "category": "boss",
+      "type": "weekly",
+      "days": ["Mon", "Thu", "Sat"],
+      "time": "21:30"
+    },
+    {
+      "id": "guardian-lord-nahma",
+      "name": "Enraged Guardian Lord Nahma",
+      "category": "boss",
+      "type": "weekly",
+      "days": ["Fri", "Sun"],
+      "time": "21:00"
+    }
+  ]
+}
