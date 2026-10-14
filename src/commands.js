@@ -1,4 +1,4 @@
-import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ChannelType, MessageFlags, OAuth2Scopes, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { buildBoard } from './render.js';
 import { groupState, guildState, regionFor, saveState } from './store.js';
 
@@ -66,6 +66,13 @@ export function missingPermissions(channel, me) {
   return REQUIRED.filter(([flag]) => !perms.has(flag)).map(([, name]) => name);
 }
 
+const notAMember = (client) =>
+  `I'm not a member of this server, so I can't post here (only my commands were added).\n` +
+  `Add me with this link, then try again: ${client.generateInvite({
+    scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands],
+    permissions: REQUIRED.map(([flag]) => flag),
+  })}`;
+
 const cantPost = (channelId, missing) =>
   `I can't post in <#${channelId}>. I'm missing: **${missing.join('**, **')}**.\n` +
   `Fix: Edit Channel → Permissions → add my role and allow those.`;
@@ -106,6 +113,8 @@ export async function handleInteraction(interaction, ctx) {
 
     case 'post': {
       if (!canManage(interaction)) return interaction.reply(ephemeral('You need the Manage Server permission.'));
+      // Installed with only the applications.commands scope: commands work, but the bot isn't a member.
+      if (!interaction.inCachedGuild()) return interaction.reply(ephemeral(notAMember(interaction.client)));
       const channelId = interaction.options.getChannel('channel')?.id ?? interaction.channelId;
       const channel =
         interaction.guild?.channels.cache.get(channelId) ??
