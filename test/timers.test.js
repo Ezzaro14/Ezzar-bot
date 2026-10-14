@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DateTime } from 'luxon';
-import { buildCommandData } from '../src/commands.js';
+import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
+import { buildCommandData, missingPermissions } from '../src/commands.js';
 import { buildBoard } from '../src/render.js';
 import { endsAt, loadConfig, nextOccurrence, upcoming, validateConfig } from '../src/timers.js';
 
@@ -154,4 +155,13 @@ test('one slash command per group, with region choices', () => {
   assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed'].sort());
   const region = commands.find((c) => c.name === 'events').options.find((o) => o.name === 'region');
   assert.deepEqual(region.options[0].choices.map((c) => c.value), Object.keys(config.regions));
+});
+
+test('missingPermissions names what the bot lacks in a channel', () => {
+  const channel = (...flags) => ({ permissionsFor: () => new PermissionsBitField(flags) });
+  const me = {};
+  const { ViewChannel, SendMessages, EmbedLinks } = PermissionFlagsBits;
+  assert.deepEqual(missingPermissions(channel(ViewChannel, SendMessages, EmbedLinks), me), []);
+  assert.deepEqual(missingPermissions(channel(ViewChannel), me), ['Send Messages', 'Embed Links']);
+  assert.deepEqual(missingPermissions(null, me), ['View Channel', 'Send Messages', 'Embed Links']);
 });

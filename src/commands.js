@@ -52,6 +52,24 @@ export function buildCommandData(config) {
 const canManage = (interaction) => interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
 const ephemeral = (content) => ({ content, flags: MessageFlags.Ephemeral });
 
+// What the bot needs in a channel to post a board there.
+const REQUIRED = [
+  [PermissionFlagsBits.ViewChannel, 'View Channel'],
+  [PermissionFlagsBits.SendMessages, 'Send Messages'],
+  [PermissionFlagsBits.EmbedLinks, 'Embed Links'],
+];
+
+/** Names of the REQUIRED permissions the bot lacks in `channel` (all of them if it can't be checked). */
+export function missingPermissions(channel, me) {
+  const perms = me && channel?.permissionsFor?.(me);
+  if (!perms) return REQUIRED.map(([, name]) => name);
+  return REQUIRED.filter(([flag]) => !perms.has(flag)).map(([, name]) => name);
+}
+
+const cantPost = (channelId, missing) =>
+  `I can't post in <#${channelId}>. I'm missing: **${missing.join('**, **')}**.\n` +
+  `Fix: Edit Channel → Permissions → add my role and allow those.`;
+
 /** ctx = { config, state, intervalMinutes, refreshGuild(guildId, groupId?) } */
 export async function handleInteraction(interaction, ctx) {
   if (interaction.isAutocomplete()) return autocompleteBoss(interaction, ctx);
@@ -88,14 +106,18 @@ export async function handleInteraction(interaction, ctx) {
 
     case 'post': {
       if (!canManage(interaction)) return interaction.reply(ephemeral('You need the Manage Server permission.'));
-      const channel = interaction.options.getChannel('channel') ?? interaction.channel;
+      const channelId = interaction.options.getChannel('channel')?.id ?? interaction.channelId;
+      const channel =
+        interaction.guild?.channels.cache.get(channelId) ??
+        (await interaction.client.channels.fetch(channelId).catch(() => null));
+      const missing = missingPermissions(channel, interaction.guild?.members.me);
+      if (missing.length) return interaction.reply(ephemeral(cantPost(channelId, missing)));
       let message;
       try {
         message = await channel.send({ embeds: [board()] });
-      } catch {
-        return interaction.reply(
-          ephemeral(`I can't post in ${channel}. Check that I can view the channel, send messages and embed links.`),
-        );
+      } catch (err) {
+        console.error(`Posting ${groupId} board in channel ${channelId} failed:`, err.message);
+        return interaction.reply(ephemeral(cantPost(channelId, REQUIRED.map(([, name]) => name))));
       }
       await deleteOldBoard(interaction.client, settings);
       settings.channelId = channel.id;

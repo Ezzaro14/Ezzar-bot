@@ -13,6 +13,18 @@ Each command has:
 - `show`: see the timers (only you)
 - `post [channel]`: post a board that keeps itself updated
 - `stop`: remove the board
-- `region [region]`: see or change the server region (NA East, NA West, Europe, South America, Asia)
 
-`post`, `stop` and changing the region need **Manage Server**.
+## Server region
+
+Each command has its own region, so `/events` and `/bosses` can use different ones.
+
+| Command | What |
+| --- | --- |
+| `/events region` | Show the current region |
+| `/events region Europe` | Set the region |
+| `/bosses region NA East` | Same for bosses |
+| `/resets region Asia` | Same for resets |
+
+Regions: NA East, NA West, Europe, South America, Asia. Default: Europe.
+
+`post`, `stop` and setting a region need **Manage Server**.
