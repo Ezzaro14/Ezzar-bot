@@ -3,45 +3,49 @@ import { DateTime } from 'luxon';
 import { upcoming } from './timers.js';
 
 const ts = (dt, style) => `<t:${Math.floor(dt.toSeconds())}:${style}>`;
+const DESCRIPTION_LIMIT = 4096;
+const COLOR_IDLE = 0x5865f2;
+const COLOR_ACTIVE = 0x57f287;
 
-function line({ timer, next }, now) {
-  const where = timer.location ? ` · ${timer.location}` : '';
-  if (!next) return `**${timer.name}** — unknown, use \`/killed\`${where}`;
-  if (next <= now) return `**${timer.name}** — 🟢 up since ${ts(next, 't')} (${ts(next, 'R')})${where}`;
-  return `**${timer.name}** — ${ts(next, 'F')} (${ts(next, 'R')})${where}`;
+/** "in 2 hours · 9:30 PM"; the full date only once it's more than a day away. */
+const when = (dt, now) => `${ts(dt, 'R')} · ${ts(dt, dt.diff(now, 'hours').hours < 24 ? 't' : 'F')}`;
+
+const isActive = ({ next, endsAt }, now) => Boolean(endsAt) || (next != null && next <= now);
+
+function status({ next, endsAt }, now) {
+  if (endsAt) return `Open now · ends ${ts(endsAt, 'R')}`;
+  if (!next) return 'Not tracked · use `/killed`';
+  if (next <= now) return `Up since ${ts(next, 'R')}`;
+  return when(next, now);
 }
 
-export function buildBoard(config, { now = DateTime.utc(), kills = {}, intervalMinutes = 5 } = {}) {
-  const entries = upcoming(config, { now, kills });
+/** One line per timer: "**Name** - time", location in italics at the end. */
+function block(entry, now) {
+  const where = entry.timer.location ? ` · *${entry.timer.location}*` : '';
+  return `**${entry.timer.name}** - ${status(entry, now)}${where}`;
+}
+
+/** The board for one group (= one command) as it runs in `region`. */
+export function buildBoard(config, { group, region, now = DateTime.utc(), kills = {}, intervalMinutes = 5 }) {
+  const entries = upcoming(config, { group, region, now, kills });
+  // Running timers first; the rest keep upcoming()'s soonest-first order (sort is stable).
+  const ordered = [...entries].sort((a, b) => isActive(b, now) - isActive(a, now));
   const embed = new EmbedBuilder()
-    .setTitle('AION 2 Timers')
-    .setColor(0x5865f2)
-    .setFooter({ text: `Times shown in your local timezone · refreshes every ${intervalMinutes} min · last update` })
+    .setTitle(`${config.groups[group].name} · ${config.regions[region].name}`)
+    .setColor(ordered.some((entry) => isActive(entry, now)) ? COLOR_ACTIVE : COLOR_IDLE)
+    .setFooter({ text: `AION 2 · your local time · updates every ${intervalMinutes} min` })
     .setTimestamp(now.toJSDate());
 
-  const categories = config.categories ?? {};
-  const groups = new Map();
-  for (const entry of entries) {
-    const key = entry.timer.category ?? 'other';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(line(entry, now));
-  }
+  if (!ordered.length) return embed.setDescription('No timers configured. Edit `config/timers.json`.');
 
-  for (const [key, lines] of groups) {
-    // Embed field values cap at 1024 chars; split long categories over several fields.
-    let chunk = '';
-    let first = true;
-    for (const text of lines) {
-      if (chunk && chunk.length + text.length + 1 > 1024) {
-        embed.addFields({ name: first ? categories[key] ?? key : '​', value: chunk });
-        chunk = '';
-        first = false;
-      }
-      chunk += (chunk ? '\n' : '') + text;
+  let description = '';
+  for (const entry of ordered) {
+    const next = description ? `${description}\n\n${block(entry, now)}` : block(entry, now);
+    if (next.length > DESCRIPTION_LIMIT - 2) {
+      description += '\n…';
+      break;
     }
-    if (chunk) embed.addFields({ name: first ? categories[key] ?? key : '​', value: chunk });
+    description = next;
   }
-
-  if (!entries.length) embed.setDescription('No timers configured. Edit `config/timers.json`.');
-  return embed;
+  return embed.setDescription(description);
 }

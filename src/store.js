@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url));
 
-// state = { guilds: { [guildId]: { channelId, messageId, kills: { [timerId]: epochMs } } } }
+// state = { guilds: { [guildId]: {
+//   kills: { [timerId]: epochMs },
+//   groups: { [groupId]: { region, channelId, messageId } },
+// } } }
 export function loadState() {
   try {
     return JSON.parse(readFileSync(STATE_PATH, 'utf8'));
@@ -24,5 +27,16 @@ export function saveState(state) {
 export function guildState(state, guildId) {
   state.guilds[guildId] ??= { kills: {} };
   state.guilds[guildId].kills ??= {};
+  state.guilds[guildId].groups ??= {};
   return state.guilds[guildId];
+}
+
+export function groupState(guild, groupId) {
+  guild.groups[groupId] ??= {};
+  return guild.groups[groupId];
+}
+
+/** The region a guild picked for a group, falling back to the default if unset or no longer configured. */
+export function regionFor(config, settings) {
+  return config.regions[settings?.region] ? settings.region : config.defaultRegion;
 }

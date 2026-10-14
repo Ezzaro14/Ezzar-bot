@@ -6,3 +6,6 @@ node_modules/
 
 # Bot runtime state
 data/
+
+# Personal setup notes
+SETUP.md

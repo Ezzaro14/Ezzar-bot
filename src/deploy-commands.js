@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
-import { commandData } from './commands.js';
+import { buildCommandData } from './commands.js';
+import { loadConfig } from './timers.js';
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID) {
@@ -8,6 +9,7 @@ if (!DISCORD_TOKEN || !CLIENT_ID) {
   process.exit(1);
 }
 
+const commandData = buildCommandData(loadConfig());
 const rest = new REST().setToken(DISCORD_TOKEN);
 const route = GUILD_ID ? Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID) : Routes.applicationCommands(CLIENT_ID);
 

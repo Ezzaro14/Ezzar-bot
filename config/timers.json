@@ -1,30 +1,67 @@
 {
-  "serverTimezone": "Asia/Seoul",
-  "categories": {
-    "boss": "Field Bosses",
-    "reset": "Resets"
+  "defaultRegion": "eu",
+  "regions": {
+    "na-east": { "name": "NA East", "timezone": "America/New_York" },
+    "na-west": { "name": "NA West", "timezone": "America/Los_Angeles" },
+    "eu": { "name": "Europe", "timezone": "Europe/Berlin" },
+    "sa": { "name": "South America", "timezone": "America/Sao_Paulo" },
+    "asia": { "name": "Asia", "timezone": "Asia/Seoul" }
+  },
+  "groups": {
+    "events": {
+      "name": "Scheduled Events",
+      "description": "Shugo Festival, Spacetime Rift, Dimensional Invasion and Artifact Siege"
+    },
+    "bosses": {
+      "name": "World Bosses",
+      "description": "Siege bosses, Guardian Lord Nahma and Watcher Kaira"
+    },
+    "resets": {
+      "name": "Resets",
+      "description": "Daily and weekly resets"
+    }
   },
   "timers": [
     {
-      "id": "daily-reset",
-      "name": "Daily Reset",
-      "category": "reset",
-      "type": "daily",
-      "time": "05:00"
+      "id": "shugo-festival",
+      "name": "Shugo Festival",
+      "group": "events",
+      "type": "hourly",
+      "durationMinutes": 10,
+      "minute": 0
     },
     {
-      "id": "weekly-reset",
-      "name": "Weekly Reset",
-      "category": "reset",
+      "id": "dimensional-invasion",
+      "name": "Dimensional Invasion",
+      "group": "events",
+      "type": "hourly",
+      "durationMinutes": 15,
+      "minute": 30
+    },
+    {
+      "id": "spacetime-rift",
+      "name": "Spacetime Rift",
+      "group": "events",
+      "type": "daily",
+      "durationMinutes": 10,
+      "times": ["02:00", "05:00", "08:00", "11:00", "14:00", "17:00", "20:00", "23:00"]
+    },
+    {
+      "id": "artifact-siege",
+      "name": "Artifact Siege",
+      "group": "events",
       "type": "weekly",
-      "days": ["Wed"],
-      "time": "05:00"
+      "durationMinutes": 30,
+      "days": ["Mon", "Thu", "Sat"],
+      "time": "21:00",
+      "location": "Lower & Middle Abyss"
     },
     {
       "id": "executor-argo",
       "name": "Executor Argo",
-      "category": "boss",
+      "group": "bosses",
       "type": "weekly",
+      "durationMinutes": 30,
       "days": ["Mon", "Thu", "Sat"],
       "time": "21:30",
       "location": "Siel's Heart"
@@ -32,8 +69,9 @@
     {
       "id": "executor-tamasa",
       "name": "Executor Tamasa",
-      "category": "boss",
+      "group": "bosses",
       "type": "weekly",
+      "durationMinutes": 30,
       "days": ["Mon", "Thu", "Sat"],
       "time": "21:30",
       "location": "Reshanta's Root"
@@ -41,8 +79,9 @@
     {
       "id": "executor-kaira",
       "name": "Executor Kaira",
-      "category": "boss",
+      "group": "bosses",
       "type": "weekly",
+      "durationMinutes": 30,
       "days": ["Mon", "Thu", "Sat"],
       "time": "21:30",
       "location": "Sulfur Tree Island"
@@ -50,26 +89,55 @@
     {
       "id": "executioner-dramos",
       "name": "Executioner Dramos",
-      "category": "boss",
+      "group": "bosses",
       "type": "weekly",
+      "durationMinutes": 30,
       "days": ["Mon", "Thu", "Sat"],
       "time": "21:30"
     },
     {
       "id": "ravager-marakha",
       "name": "Ravager Marakha",
-      "category": "boss",
+      "group": "bosses",
       "type": "weekly",
+      "durationMinutes": 30,
       "days": ["Mon", "Thu", "Sat"],
       "time": "21:30"
     },
     {
       "id": "guardian-lord-nahma",
       "name": "Enraged Guardian Lord Nahma",
-      "category": "boss",
+      "group": "bosses",
       "type": "weekly",
+      "durationMinutes": 30,
       "days": ["Fri", "Sun"],
       "time": "21:00"
+    },
+    {
+      "id": "watcher-kaira",
+      "name": "Watcher Kaira",
+      "group": "bosses",
+      "type": "daily",
+      "durationMinutes": 30,
+      "times": ["01:00", "04:00", "07:00", "10:00", "13:00", "16:00", "19:00", "22:00"],
+      "location": "Lower Reshanta"
+    },
+    {
+      "id": "daily-reset",
+      "name": "Daily Reset",
+      "group": "resets",
+      "type": "daily",
+      "time": "07:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "weekly-reset",
+      "name": "Weekly Reset",
+      "group": "resets",
+      "type": "weekly",
+      "days": ["Wed"],
+      "time": "07:00",
+      "timezone": "UTC"
     }
   ]
 }
