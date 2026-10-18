@@ -61,4 +61,11 @@ Ping a role before a boss or event spawns.
 
 The role must allow @mentions (Server Settings → Roles → Allow anyone to @mention this role).
 
+## Other
+
+| Command | What |
+| --- | --- |
+| `/help` | List all commands |
+| `/invite` | Get a link to add the bot to your server |
+
 `post`, `stop`, setting a region or faction and changing alerts need **Manage Server**.

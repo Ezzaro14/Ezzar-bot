@@ -4,7 +4,7 @@ import { DateTime } from 'luxon';
 const WEEKDAYS = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
 // Slash command names; a group's key becomes its command, so it must fit and not collide.
 const COMMAND_NAME = /^[a-z0-9_-]{1,32}$/;
-const RESERVED_COMMANDS = new Set(['killed', 'alerts']);
+const RESERVED_COMMANDS = new Set(['killed', 'alerts', 'invite', 'help']);
 
 export function loadConfig(path = new URL('../config/timers.json', import.meta.url)) {
   const config = JSON.parse(readFileSync(path, 'utf8'));
@@ -34,7 +34,7 @@ export function validateConfig(config) {
 
   for (const [id, group] of Object.entries(config.groups ?? {})) {
     if (!COMMAND_NAME.test(id) || RESERVED_COMMANDS.has(id)) {
-      throw new Error(`Group "${id}" can't be used as a command name (lowercase letters, digits, - or _; not "killed" or "alerts")`);
+      throw new Error(`Group "${id}" can't be used as a command name (lowercase letters, digits, - or _; not "killed", "alerts", "invite" or "help")`);
     }
     if (!group.name) throw new Error(`Group ${id} needs a name`);
     if (!group.description || group.description.length > 100) {

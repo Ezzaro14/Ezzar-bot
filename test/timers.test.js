@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { DateTime } from 'luxon';
 import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { alertMessage, dueAlerts } from '../src/alerts.js';
-import { buildCommandData, missingPermissions } from '../src/commands.js';
+import { buildCommandData, helpEmbed, missingPermissions } from '../src/commands.js';
 import { buildBoard } from '../src/render.js';
 import { endsAt, loadConfig, nextOccurrence, upcoming, validateConfig } from '../src/timers.js';
 
@@ -153,7 +153,7 @@ test('shipped config is valid and renders every group in every region', () => {
 test('one slash command per group, with region choices', () => {
   const config = loadConfig();
   const commands = buildCommandData(config);
-  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed', 'alerts'].sort());
+  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed', 'alerts', 'invite', 'help'].sort());
   const region = commands.find((c) => c.name === 'events').options.find((o) => o.name === 'region');
   assert.deepEqual(region.options[0].choices.map((c) => c.value), Object.keys(config.regions));
 });
@@ -243,4 +243,12 @@ test('factions: boards, commands and alerts only include the picked faction', ()
   const t = DateTime.fromISO('2026-10-14T10:50', { zone });
   assert.deepEqual(dueAlerts(config, guild(undefined), t).map((d) => d.timer.id), ['asmo']);
   assert.deepEqual(dueAlerts(config, guild('e'), t).map((d) => d.timer.id), ['ely']);
+});
+
+test('help lists every command', () => {
+  const config = loadConfig();
+  const { description } = helpEmbed(config).toJSON();
+  for (const { name } of buildCommandData(config)) assert.match(description, new RegExp(`\\*\\*/${name}\\*\\*`));
+  assert.match(description, /\*\*\/killed\*\* - .+\n`boss` `\[minutes_ago\]`/);
+  assert.match(description, /\*\*\/bosses\*\* - .+\n`show` `post` `stop` `region` `faction`/);
 });

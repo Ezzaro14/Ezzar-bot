@@ -1,10 +1,21 @@
-import { ChannelType, MessageFlags, OAuth2Scopes, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ApplicationCommandOptionType,
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelType,
+  EmbedBuilder,
+  MessageFlags,
+  OAuth2Scopes,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from 'discord.js';
 import { DEFAULT_MINUTES_BEFORE } from './alerts.js';
 import { buildBoard } from './render.js';
 import { factionFor, groupState, guildState, regionFor, saveState } from './store.js';
 import { hasFactions, shownFor } from './timers.js';
 
-/** One command per timer group (e.g. /events, /bosses), plus /killed and /alerts. */
+/** One command per timer group (e.g. /events, /bosses), plus /killed, /alerts, /invite and /help. */
 export function buildCommandData(config) {
   const regionChoices = Object.entries(config.regions).map(([value, region]) => ({ name: region.name, value }));
 
@@ -93,7 +104,27 @@ export function buildCommandData(config) {
     .addSubcommand((sub) => sub.setName('remove').setDescription('Stop pinging for a boss or event').addStringOption(timerOption))
     .addSubcommand((sub) => sub.setName('list').setDescription('Show the alerts set up in this server'));
 
-  return [...groupCommands, killed, alerts].map((command) => command.toJSON());
+  const invite = new SlashCommandBuilder().setName('invite').setDescription('Get a link to add this bot to your server');
+
+  const help = new SlashCommandBuilder().setName('help').setDescription('List all commands');
+
+  return [...groupCommands, killed, alerts, invite, help].map((command) => command.toJSON());
+}
+
+/** /help: every command with its subcommands or options, built from the command definitions. */
+export function helpEmbed(config) {
+  const usage = (opt) => `\`${opt.required ? opt.name : `[${opt.name}]`}\``;
+  const lines = buildCommandData(config).map((command) => {
+    const options = command.options ?? [];
+    const subcommands = options.filter((o) => o.type === ApplicationCommandOptionType.Subcommand);
+    const detail = subcommands.length ? subcommands.map((o) => `\`${o.name}\``) : options.map(usage);
+    return [`**/${command.name}** - ${command.description}`, detail.join(' ')].filter(Boolean).join('\n');
+  });
+  return new EmbedBuilder()
+    .setTitle('Commands')
+    .setColor(0x5865f2)
+    .setDescription(lines.join('\n\n'))
+    .setFooter({ text: 'Posting boards, setting region or faction, and changing alerts need Manage Server' });
 }
 
 const canManage = (interaction) => interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
@@ -119,12 +150,16 @@ export function missingPermissions(channel, me, required = REQUIRED) {
   return required.filter(([flag]) => !perms.has(flag)).map(([, name]) => name);
 }
 
-const notAMember = (client) =>
-  `I'm not a member of this server, so I can't post here (only my commands were added).\n` +
-  `Add me with this link, then try again: ${client.generateInvite({
+/** Adds the bot as a member (bot scope) with its commands and the permissions boards need. */
+const inviteLink = (client) =>
+  client.generateInvite({
     scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands],
     permissions: REQUIRED.map(([flag]) => flag),
-  })}`;
+  });
+
+const notAMember = (client) =>
+  `I'm not a member of this server, so I can't post here (only my commands were added).\n` +
+  `Add me with this link, then try again: ${inviteLink(client)}`;
 
 const cantPost = (channelId, missing) =>
   `I can't post in <#${channelId}>. I'm missing: **${missing.join('**, **')}**.\n` +
@@ -145,7 +180,21 @@ async function targetChannel(interaction, required) {
 /** ctx = { config, state, intervalMinutes, refreshGuild(guildId, groupId?) } */
 export async function handleInteraction(interaction, ctx) {
   if (interaction.isAutocomplete()) return autocompleteTimer(interaction, ctx);
-  if (!interaction.isChatInputCommand() || !interaction.guildId) return;
+  if (!interaction.isChatInputCommand()) return;
+
+  // /help and /invite work anywhere, DMs included.
+  if (interaction.commandName === 'help') {
+    return interaction.reply({ embeds: [helpEmbed(ctx.config)], flags: MessageFlags.Ephemeral });
+  }
+  if (interaction.commandName === 'invite') {
+    const button = new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Add to server').setURL(inviteLink(interaction.client));
+    return interaction.reply({
+      content: 'Add Ezzar-bot to your server. You need **Manage Server** there.',
+      components: [new ActionRowBuilder().addComponents(button)],
+    });
+  }
+
+  if (!interaction.guildId) return;
 
   const guild = guildState(ctx.state, interaction.guildId);
 
