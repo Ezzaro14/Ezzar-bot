@@ -6,7 +6,7 @@ const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url))
 
 // state = { guilds: { [guildId]: {
 //   kills: { [timerId]: epochMs },
-//   groups: { [groupId]: { region, channelId, messageId } },
+//   groups: { [groupId]: { region, faction, channelId, messageId } },
 //   alerts: { [timerId]: { roleId, channelId, minutesBefore, sentFor } },
 // } } }
 export function loadState() {
@@ -41,4 +41,10 @@ export function groupState(guild, groupId) {
 /** The region a guild picked for a group, falling back to the default if unset or no longer configured. */
 export function regionFor(config, settings) {
   return config.regions[settings?.region] ? settings.region : config.defaultRegion;
+}
+
+/** The faction a guild picked for a group, like regionFor; null when the config has no factions. */
+export function factionFor(config, settings) {
+  if (!config.factions) return null;
+  return config.factions[settings?.faction] ? settings.faction : config.defaultFaction;
 }

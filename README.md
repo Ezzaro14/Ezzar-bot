@@ -27,6 +27,17 @@ Each command has its own region, so `/events` and `/bosses` can use different on
 
 Regions: NA East, NA West, Europe, South America, Asia. Default: Europe.
 
+## Faction
+
+`/bosses` only shows your faction's field bosses (Gartua, Dartan).
+
+| Command | What |
+| --- | --- |
+| `/bosses faction` | Show the current faction |
+| `/bosses faction Elyos` | Switch faction |
+
+Default: Asmodian.
+
 ## Field bosses
 
 Gartua and Dartan respawn a set time after they die, so they start counting once someone
@@ -50,4 +61,4 @@ Ping a role before a boss or event spawns.
 
 The role must allow @mentions (Server Settings → Roles → Allow anyone to @mention this role).
 
-`post`, `stop`, setting a region and changing alerts need **Manage Server**.
+`post`, `stop`, setting a region or faction and changing alerts need **Manage Server**.

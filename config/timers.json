@@ -7,6 +7,11 @@
     "sa": { "name": "South America", "timezone": "America/Sao_Paulo" },
     "asia": { "name": "Asia", "timezone": "Asia/Seoul" }
   },
+  "defaultFaction": "asmodian",
+  "factions": {
+    "asmodian": { "name": "Asmodian" },
+    "elyos": { "name": "Elyos" }
+  },
   "groups": {
     "events": {
       "name": "Scheduled Events",
@@ -124,6 +129,7 @@
     },
     {
       "id": "eternal-gartua",
+      "faction": "elyos",
       "name": "Eternal Gartua",
       "group": "bosses",
       "type": "respawn",
@@ -132,6 +138,7 @@
     },
     {
       "id": "immortal-gartua",
+      "faction": "asmodian",
       "name": "Immortal Gartua",
       "group": "bosses",
       "type": "respawn",
@@ -140,6 +147,7 @@
     },
     {
       "id": "silent-dartan-verteron",
+      "faction": "elyos",
       "name": "Silent Dartan",
       "group": "bosses",
       "type": "respawn",
@@ -148,6 +156,7 @@
     },
     {
       "id": "silent-dartan-altgard",
+      "faction": "asmodian",
       "name": "Silent Dartan",
       "group": "bosses",
       "type": "respawn",

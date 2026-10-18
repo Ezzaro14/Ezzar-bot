@@ -3,7 +3,7 @@ import { Client, Events, GatewayIntentBits, MessageFlags, RESTJSONErrorCodes } f
 import { alertMessage, dueAlerts } from './alerts.js';
 import { handleInteraction } from './commands.js';
 import { buildBoard } from './render.js';
-import { loadState, regionFor, saveState } from './store.js';
+import { factionFor, loadState, regionFor, saveState } from './store.js';
 import { loadConfig } from './timers.js';
 
 const token = process.env.DISCORD_TOKEN;
@@ -36,6 +36,7 @@ async function refreshBoard(guildId, groupId) {
     const embed = buildBoard(config, {
       group: groupId,
       region: regionFor(config, settings),
+      faction: factionFor(config, settings),
       kills: guild.kills,
       intervalMinutes,
     });

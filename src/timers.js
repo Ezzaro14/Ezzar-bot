@@ -22,6 +22,16 @@ export function validateConfig(config) {
   }
   if (!config.regions[config.defaultRegion]) throw new Error(`defaultRegion "${config.defaultRegion}" is not a region`);
 
+  // Optional: timers with a "faction" only show for servers that picked that faction.
+  if (config.factions) {
+    for (const [id, faction] of Object.entries(config.factions)) {
+      if (!faction.name) throw new Error(`Faction ${id} needs a name`);
+    }
+    if (!config.factions[config.defaultFaction]) {
+      throw new Error(`defaultFaction "${config.defaultFaction}" is not a faction`);
+    }
+  }
+
   for (const [id, group] of Object.entries(config.groups ?? {})) {
     if (!COMMAND_NAME.test(id) || RESERVED_COMMANDS.has(id)) {
       throw new Error(`Group "${id}" can't be used as a command name (lowercase letters, digits, - or _; not "killed" or "alerts")`);
@@ -38,6 +48,9 @@ export function validateConfig(config) {
     if (ids.has(timer.id)) throw new Error(`Duplicate timer id: ${timer.id}`);
     ids.add(timer.id);
     if (!config.groups?.[timer.group]) throw new Error(`${timer.id}: unknown group "${timer.group}"`);
+    if (timer.faction != null && !config.factions?.[timer.faction]) {
+      throw new Error(`${timer.id}: unknown faction "${timer.faction}"`);
+    }
     validateSchedule(timer);
   }
 }
@@ -157,14 +170,20 @@ export function endsAt(timer, { now = DateTime.utc(), zone, kills = {} }) {
   return start && start <= now && end > now ? end : null;
 }
 
+/** Whether a timer shows for a faction; timers without one show for everyone. */
+export const shownFor = (timer, faction) => !timer.faction || !faction || timer.faction === faction;
+
+/** Whether a group has faction-specific timers (and so a faction setting). */
+export const hasFactions = (config, group) => config.timers.some((t) => t.group === group && t.faction);
+
 /**
- * A group's timers in a region's clock, with their next occurrence (and end, if running now),
+ * A group's timers (for `faction`, if given) in a region's clock, with their next occurrence (and end, if running now),
  * soonest first; unknown ones last.
  */
-export function upcoming(config, { group, region, now = DateTime.utc(), kills = {} }) {
+export function upcoming(config, { group, region, faction, now = DateTime.utc(), kills = {} }) {
   const zone = config.regions[region].timezone;
   return config.timers
-    .filter((timer) => timer.group === group)
+    .filter((timer) => timer.group === group && shownFor(timer, faction))
     .map((timer) => ({
       timer,
       next: nextOccurrence(timer, { now, zone, kills }),

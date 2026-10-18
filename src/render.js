@@ -1,6 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { DateTime } from 'luxon';
-import { upcoming } from './timers.js';
+import { hasFactions, upcoming } from './timers.js';
 
 const ts = (dt, style) => `<t:${Math.floor(dt.toSeconds())}:${style}>`;
 const DESCRIPTION_LIMIT = 4096;
@@ -25,13 +25,15 @@ function block(entry, now) {
   return `**${entry.timer.name}** - ${status(entry, now)}${where}`;
 }
 
-/** The board for one group (= one command) as it runs in `region`. */
-export function buildBoard(config, { group, region, now = DateTime.utc(), kills = {}, intervalMinutes = 5 }) {
-  const entries = upcoming(config, { group, region, now, kills });
+/** The board for one group (= one command) as it runs in `region`, for `faction` if the group has faction bosses. */
+export function buildBoard(config, { group, region, faction, now = DateTime.utc(), kills = {}, intervalMinutes = 5 }) {
+  const entries = upcoming(config, { group, region, faction, now, kills });
+  const title = [config.groups[group].name, config.regions[region].name];
+  if (faction && hasFactions(config, group)) title.push(config.factions[faction].name);
   // Running timers first; the rest keep upcoming()'s soonest-first order (sort is stable).
   const ordered = [...entries].sort((a, b) => isActive(b, now) - isActive(a, now));
   const embed = new EmbedBuilder()
-    .setTitle(`${config.groups[group].name} · ${config.regions[region].name}`)
+    .setTitle(title.join(' · '))
     .setColor(ordered.some((entry) => isActive(entry, now)) ? COLOR_ACTIVE : COLOR_IDLE)
     .setFooter({ text: `AION 2 · your local time · updates every ${intervalMinutes} min` })
     .setTimestamp(now.toJSDate());

@@ -209,3 +209,38 @@ test('dueAlerts: uses the group region and respawn kills', () => {
   const kills = { field: t.minus({ minutes: 50 }).toMillis() };
   assert.deepEqual(dueAlerts(config, { groups: {}, kills, alerts }, t).map((d) => d.timer.id).sort(), ['boss', 'field']);
 });
+
+test('factions: boards, commands and alerts only include the picked faction', () => {
+  const config = {
+    regions,
+    defaultRegion: 'kr',
+    defaultFaction: 'a',
+    factions: { a: { name: 'Asmodian' }, e: { name: 'Elyos' } },
+    groups,
+    timers: [
+      { id: 'shared', name: 'Shared', group: 'g', type: 'daily', time: '11:00' },
+      { id: 'asmo', name: 'Asmo', group: 'g', faction: 'a', type: 'daily', time: '11:00' },
+      { id: 'ely', name: 'Ely', group: 'g', faction: 'e', type: 'daily', time: '11:00' },
+      { id: 'other', name: 'Other', group: 'other', type: 'daily', time: '11:00' },
+    ],
+  };
+  assert.doesNotThrow(() => validateConfig(config));
+  assert.throws(() => validateConfig({ ...config, timers: [{ ...config.timers[1], faction: 'x' }] }));
+  assert.throws(() => validateConfig({ ...config, defaultFaction: 'x' }));
+
+  const ids = (faction) => upcoming(config, { group: 'g', region: 'kr', faction, now }).map((e) => e.timer.id).sort();
+  assert.deepEqual(ids('a'), ['asmo', 'shared']);
+  assert.deepEqual(ids('e'), ['ely', 'shared']);
+  assert.match(buildBoard(config, { group: 'g', region: 'kr', faction: 'a', now }).toJSON().title, /Korea · Asmodian$/);
+  assert.doesNotMatch(buildBoard(config, { group: 'other', region: 'kr', faction: 'a', now }).toJSON().title, /Asmodian/);
+
+  const subcommands = (name) => buildCommandData(config).find((c) => c.name === name).options.map((o) => o.name);
+  assert.ok(subcommands('g').includes('faction'));
+  assert.ok(!subcommands('other').includes('faction'));
+
+  const alert = { roleId: '1', channelId: '1', minutesBefore: 15 };
+  const guild = (faction) => ({ groups: { g: { faction } }, kills: {}, alerts: { asmo: { ...alert }, ely: { ...alert } } });
+  const t = DateTime.fromISO('2026-10-14T10:50', { zone });
+  assert.deepEqual(dueAlerts(config, guild(undefined), t).map((d) => d.timer.id), ['asmo']);
+  assert.deepEqual(dueAlerts(config, guild('e'), t).map((d) => d.timer.id), ['ely']);
+});
