@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { Client, Events, GatewayIntentBits, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
+import { alertMessage, dueAlerts } from './alerts.js';
 import { handleInteraction } from './commands.js';
 import { buildBoard } from './render.js';
 import { loadState, regionFor, saveState } from './store.js';
@@ -12,6 +13,7 @@ if (!token) {
 }
 
 const intervalMinutes = Number(process.env.UPDATE_INTERVAL_MINUTES) || 5;
+const ALERT_CHECK_MS = 30_000;
 const config = loadConfig();
 const state = loadState();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -54,12 +56,44 @@ async function refreshAll() {
   await Promise.all(Object.keys(state.guilds).map((guildId) => refreshGuild(guildId)));
 }
 
+/** Sends role pings for timers spawning soon; each spawn is announced once. */
+async function sendAlerts() {
+  const sends = [];
+  for (const [guildId, guild] of Object.entries(state.guilds)) {
+    for (const due of dueAlerts(config, guild)) {
+      // Marked before sending so a failing channel isn't retried every check.
+      due.alert.sentFor = due.next.toMillis();
+      sends.push(sendAlert(guildId, guild, due));
+    }
+  }
+  if (!sends.length) return;
+  saveState(state);
+  await Promise.all(sends);
+}
+
+async function sendAlert(guildId, guild, due) {
+  try {
+    const channel = await client.channels.fetch(due.alert.channelId);
+    await channel.send(alertMessage(due));
+  } catch (err) {
+    if (err.code === RESTJSONErrorCodes.UnknownChannel) {
+      console.warn(`Alert channel for ${due.timer.id} in guild ${guildId} was deleted; removing the alert.`);
+      delete guild.alerts[due.timer.id];
+      saveState(state);
+    } else {
+      console.error(`Failed to send ${due.timer.id} alert in guild ${guildId}:`, err.message);
+    }
+  }
+}
+
 const ctx = { config, state, intervalMinutes, refreshGuild };
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}; refreshing boards every ${intervalMinutes} min.`);
   await refreshAll();
   setInterval(refreshAll, intervalMinutes * 60_000);
+  await sendAlerts();
+  setInterval(() => sendAlerts().catch((err) => console.error('Alert check failed:', err)), ALERT_CHECK_MS);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

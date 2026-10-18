@@ -14,7 +14,7 @@
     },
     "bosses": {
       "name": "World Bosses",
-      "description": "Siege bosses, Guardian Lord Nahma and Watcher Kaira"
+      "description": "Siege bosses, Nahma, Watcher Kaira, Gartua and Dartan"
     },
     "resets": {
       "name": "Resets",
@@ -121,6 +121,38 @@
       "durationMinutes": 30,
       "times": ["01:00", "04:00", "07:00", "10:00", "13:00", "16:00", "19:00", "22:00"],
       "location": "Lower Reshanta"
+    },
+    {
+      "id": "eternal-gartua",
+      "name": "Eternal Gartua",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 720,
+      "location": "Verteron · Isle of Eternity"
+    },
+    {
+      "id": "immortal-gartua",
+      "name": "Immortal Gartua",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 720,
+      "location": "Altgard · Isle of Immortality"
+    },
+    {
+      "id": "silent-dartan-verteron",
+      "name": "Silent Dartan",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 360,
+      "location": "Verteron · Artamia Plateau South"
+    },
+    {
+      "id": "silent-dartan-altgard",
+      "name": "Silent Dartan",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 360,
+      "location": "Altgard · Forest of Purification"
     },
     {
       "id": "daily-reset",

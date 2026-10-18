@@ -5,7 +5,7 @@ AION 2 global-server timers in Discord, shown in your local time.
 | Command | What |
 | --- | --- |
 | `/events` | Shugo Festival, Spacetime Rift, Dimensional Invasion, Artifact Siege |
-| `/bosses` | Siege bosses, Nahma, Watcher Kaira |
+| `/bosses` | Siege bosses, Nahma, Watcher Kaira, Gartua, Dartan |
 | `/resets` | Daily and weekly reset |
 
 Each command has:
@@ -27,4 +27,27 @@ Each command has its own region, so `/events` and `/bosses` can use different on
 
 Regions: NA East, NA West, Europe, South America, Asia. Default: Europe.
 
-`post`, `stop` and setting a region need **Manage Server**.
+## Field bosses
+
+Gartua and Dartan respawn a set time after they die, so they start counting once someone
+records the kill:
+
+| Command | What |
+| --- | --- |
+| `/killed Eternal Gartua` | Killed just now |
+| `/killed Silent Dartan (Altgard) minutes_ago:20` | Killed 20 minutes ago |
+
+## Alerts
+
+Ping a role before a boss or event spawns.
+
+| Command | What |
+| --- | --- |
+| `/alerts set Eternal Gartua @Bosses` | Ping @Bosses 15 minutes before, in this channel |
+| `/alerts set Executor Argo @Siege minutes_before:10 channel:#pings` | Custom time and channel |
+| `/alerts list` | Show all alerts |
+| `/alerts remove Eternal Gartua` | Stop the alert |
+
+The role must allow @mentions (Server Settings → Roles → Allow anyone to @mention this role).
+
+`post`, `stop`, setting a region and changing alerts need **Manage Server**.

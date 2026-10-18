@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DateTime } from 'luxon';
 import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
+import { alertMessage, dueAlerts } from '../src/alerts.js';
 import { buildCommandData, missingPermissions } from '../src/commands.js';
 import { buildBoard } from '../src/render.js';
 import { endsAt, loadConfig, nextOccurrence, upcoming, validateConfig } from '../src/timers.js';
@@ -152,7 +153,7 @@ test('shipped config is valid and renders every group in every region', () => {
 test('one slash command per group, with region choices', () => {
   const config = loadConfig();
   const commands = buildCommandData(config);
-  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed'].sort());
+  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed', 'alerts'].sort());
   const region = commands.find((c) => c.name === 'events').options.find((o) => o.name === 'region');
   assert.deepEqual(region.options[0].choices.map((c) => c.value), Object.keys(config.regions));
 });
@@ -164,4 +165,47 @@ test('missingPermissions names what the bot lacks in a channel', () => {
   assert.deepEqual(missingPermissions(channel(ViewChannel, SendMessages, EmbedLinks), me), []);
   assert.deepEqual(missingPermissions(channel(ViewChannel), me), ['Send Messages', 'Embed Links']);
   assert.deepEqual(missingPermissions(null, me), ['View Channel', 'Send Messages', 'Embed Links']);
+});
+
+test('dueAlerts: fires once inside the lead time, never before or after the spawn', () => {
+  const config = {
+    regions,
+    defaultRegion: 'kr',
+    groups,
+    timers: [{ id: 'boss', name: 'Boss', group: 'g', type: 'daily', time: '11:00', location: 'Cave' }],
+  };
+  const guild = () => ({ groups: {}, kills: {}, alerts: { boss: { roleId: '42', channelId: '7', minutesBefore: 15 } } });
+  const at = (hhmm) => DateTime.fromISO(`2026-10-14T${hhmm}`, { zone });
+
+  assert.equal(dueAlerts(config, guild(), at('10:44')).length, 0);
+  const g = guild();
+  const [due] = dueAlerts(config, g, at('10:45'));
+  assert.equal(due.next.toISO(), '2026-10-14T11:00:00.000+09:00');
+  g.alerts.boss.sentFor = due.next.toMillis();
+  assert.equal(dueAlerts(config, g, at('10:50')).length, 0);
+  // Right after the spawn the next one is a day away: nothing to send.
+  assert.equal(dueAlerts(config, g, at('11:01')).length, 0);
+
+  const message = alertMessage(due);
+  assert.match(message.content, /^<@&42> \*\*Boss\*\* - spawns <t:\d+:R> · <t:\d+:t> · \*Cave\*$/);
+  assert.deepEqual(message.allowedMentions, { roles: ['42'] });
+});
+
+test('dueAlerts: uses the group region and respawn kills', () => {
+  const config = {
+    regions: { kr: { name: 'Korea', timezone: zone }, utc: { name: 'UTC', timezone: 'UTC' } },
+    defaultRegion: 'kr',
+    groups,
+    timers: [
+      { id: 'boss', name: 'Boss', group: 'g', type: 'daily', time: '11:00' },
+      { id: 'field', name: 'Field', group: 'g', type: 'respawn', respawnMinutes: 60 },
+    ],
+  };
+  const alerts = { boss: { roleId: '1', channelId: '1', minutesBefore: 15 }, field: { roleId: '1', channelId: '1', minutesBefore: 15 } };
+  // 10:50 Seoul = 01:50 UTC, so with the UTC region "11:00" is hours away.
+  const t = DateTime.fromISO('2026-10-14T10:50', { zone });
+  assert.deepEqual(dueAlerts(config, { groups: {}, kills: {}, alerts }, t).map((d) => d.timer.id), ['boss']);
+  assert.deepEqual(dueAlerts(config, { groups: { g: { region: 'utc' } }, kills: {}, alerts }, t), []);
+  const kills = { field: t.minus({ minutes: 50 }).toMillis() };
+  assert.deepEqual(dueAlerts(config, { groups: {}, kills, alerts }, t).map((d) => d.timer.id).sort(), ['boss', 'field']);
 });

@@ -7,6 +7,7 @@ const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url))
 // state = { guilds: { [guildId]: {
 //   kills: { [timerId]: epochMs },
 //   groups: { [groupId]: { region, channelId, messageId } },
+//   alerts: { [timerId]: { roleId, channelId, minutesBefore, sentFor } },
 // } } }
 export function loadState() {
   try {
@@ -28,6 +29,7 @@ export function guildState(state, guildId) {
   state.guilds[guildId] ??= { kills: {} };
   state.guilds[guildId].kills ??= {};
   state.guilds[guildId].groups ??= {};
+  state.guilds[guildId].alerts ??= {};
   return state.guilds[guildId];
 }
 
