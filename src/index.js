@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Client, Events, GatewayIntentBits, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
-import { alertMessage, dueAlerts } from './alerts.js';
+import { alertMessage, dueAlerts, takeSpawnedPings } from './alerts.js';
 import { handleInteraction } from './commands.js';
 import { reminderMessage } from './reminders.js';
 import { buildBoard } from './render.js';
@@ -78,7 +78,9 @@ async function sendAlerts() {
 async function sendAlert(guildId, guild, due) {
   try {
     const channel = await client.channels.fetch(due.alert.channelId);
-    await channel.send(alertMessage(due));
+    const message = await channel.send(alertMessage(due));
+    (guild.alertMessages ??= []).push({ channelId: channel.id, messageId: message.id, deleteAt: due.next.toMillis() });
+    saveState(state);
   } catch (err) {
     if (err.code === RESTJSONErrorCodes.UnknownChannel) {
       console.warn(`Alert channel for ${due.timer.id} in guild ${guildId} was deleted; removing the alert.`);
@@ -89,6 +91,30 @@ async function sendAlert(guildId, guild, due) {
     }
   }
 }
+
+/** Deletes alert pings once the boss or event they announced has spawned. */
+async function deleteSpawnedPings() {
+  const deletes = [];
+  for (const [guildId, guild] of Object.entries(state.guilds)) {
+    for (const ping of takeSpawnedPings(guild)) deletes.push(deletePing(guildId, ping));
+  }
+  if (!deletes.length) return;
+  saveState(state);
+  await Promise.all(deletes);
+}
+
+async function deletePing(guildId, { channelId, messageId }) {
+  try {
+    const channel = await client.channels.fetch(channelId);
+    await channel.messages.delete(messageId);
+  } catch (err) {
+    // Someone already deleted it, or its channel.
+    if (err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownChannel) return;
+    console.error(`Failed to delete an alert ping in guild ${guildId}:`, err.message);
+  }
+}
+
+const checkAlerts = () => Promise.all([sendAlerts(), deleteSpawnedPings()]);
 
 /** Sends reminders that are due; each is removed first, so it's sent at most once. */
 async function sendReminders() {
@@ -123,8 +149,8 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}; refreshing boards every ${intervalMinutes} min.`);
   await refreshAll();
   setInterval(refreshAll, intervalMinutes * 60_000);
-  await sendAlerts();
-  setInterval(() => sendAlerts().catch((err) => console.error('Alert check failed:', err)), ALERT_CHECK_MS);
+  await checkAlerts();
+  setInterval(() => checkAlerts().catch((err) => console.error('Alert check failed:', err)), ALERT_CHECK_MS);
   await sendReminders();
   setInterval(() => sendReminders().catch((err) => console.error('Reminder check failed:', err)), REMINDER_CHECK_MS);
   await cleanupTempChannels(c, state);

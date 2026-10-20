@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DateTime } from 'luxon';
 import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
-import { alertMessage, dueAlerts } from '../src/alerts.js';
+import { alertMessage, dueAlerts, takeSpawnedPings } from '../src/alerts.js';
 import { buildCommandData, helpEmbed, missingPermissions } from '../src/commands.js';
 import { buildBoard } from '../src/render.js';
 import { moveGroupSettingsToGuild } from '../src/store.js';
@@ -284,4 +284,17 @@ test('a region or faction picked per group before becomes the server one', () =>
   const set = { region: 'na-east', groups: { bosses: { region: 'asia' } } };
   moveGroupSettingsToGuild(set);
   assert.equal(set.region, 'na-east');
+});
+
+test('takeSpawnedPings: hands out each ping once its spawn has passed', () => {
+  const guild = {
+    alertMessages: [
+      { channelId: '1', messageId: 'spawned', deleteAt: 1000 },
+      { channelId: '1', messageId: 'upcoming', deleteAt: 3000 },
+    ],
+  };
+  assert.deepEqual(takeSpawnedPings(guild, 2000).map((p) => p.messageId), ['spawned']);
+  assert.deepEqual(takeSpawnedPings(guild, 2000), []);
+  assert.deepEqual(guild.alertMessages.map((p) => p.messageId), ['upcoming']);
+  assert.deepEqual(takeSpawnedPings({}, 2000), []);
 });

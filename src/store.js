@@ -9,6 +9,7 @@ const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url))
 //   kills: { [timerId]: epochMs },
 //   groups: { [groupId]: { channelId, messageId } },
 //   alerts: { [timerId]: { roleId, channelId, minutesBefore, sentFor } },
+//   alertMessages: [{ channelId, messageId, deleteAt }],  (sent pings, deleted once the spawn passes)
 //   tempVoice: { hubId, channels: [channelId] },
 // } },
 //   reminders: [{ id, userId, channelId, at, text, createdAt }],  (at, createdAt: epoch ms)

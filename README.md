@@ -52,7 +52,7 @@ once someone records the kill, or how long is left until the respawn:
 
 ## Alerts
 
-Ping a role before a boss or event spawns.
+Ping a role before a boss or event spawns. The ping is deleted once it has spawned.
 
 | Command | What |
 | --- | --- |

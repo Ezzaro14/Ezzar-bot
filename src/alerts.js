@@ -28,6 +28,13 @@ export function dueAlerts(config, guild, now = DateTime.utc()) {
   return due;
 }
 
+/** Sent pings whose spawn has passed, taken out of guild.alertMessages so each is deleted only once. */
+export function takeSpawnedPings(guild, now = Date.now()) {
+  const spawned = (guild.alertMessages ?? []).filter((ping) => ping.deleteAt <= now);
+  if (spawned.length) guild.alertMessages = guild.alertMessages.filter((ping) => ping.deleteAt > now);
+  return spawned;
+}
+
 export function alertMessage({ timer, alert, next }) {
   const where = timer.location ? ` · *${timer.location}*` : '';
   return {
