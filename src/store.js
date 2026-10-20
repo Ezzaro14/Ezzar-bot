@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url));
 
 // state = { guilds: { [guildId]: {
+//   region,
 //   kills: { [timerId]: epochMs },
-//   groups: { [groupId]: { region, faction, channelId, messageId } },
+//   groups: { [groupId]: { faction, channelId, messageId } },
 //   alerts: { [timerId]: { roleId, channelId, minutesBefore, sentFor } },
 //   tempVoice: { hubId, channels: [channelId] },
 // } },
@@ -22,7 +23,17 @@ export function loadState() {
   }
   state.reminders ??= [];
   state.users ??= {};
+  for (const guild of Object.values(state.guilds)) moveRegionToGuild(guild);
   return state;
+}
+
+/** The region used to be set per group; it's now one per server. Keeps the first one a server had picked. */
+export function moveRegionToGuild(guild) {
+  for (const settings of Object.values(guild.groups ?? {})) {
+    if (!settings.region) continue;
+    guild.region ??= settings.region;
+    delete settings.region;
+  }
 }
 
 export function saveState(state) {
@@ -45,9 +56,9 @@ export function groupState(guild, groupId) {
   return guild.groups[groupId];
 }
 
-/** The region a guild picked for a group, falling back to the default if unset or no longer configured. */
-export function regionFor(config, settings) {
-  return config.regions[settings?.region] ? settings.region : config.defaultRegion;
+/** The region a guild picked, falling back to the default if unset or no longer configured. */
+export function regionFor(config, guild) {
+  return config.regions[guild?.region] ? guild.region : config.defaultRegion;
 }
 
 /** The faction a guild picked for a group, like regionFor; null when the config has no factions. */

@@ -5,7 +5,8 @@ import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { alertMessage, dueAlerts } from '../src/alerts.js';
 import { buildCommandData, helpEmbed, missingPermissions } from '../src/commands.js';
 import { buildBoard } from '../src/render.js';
-import { endsAt, loadConfig, nextOccurrence, upcoming, validateConfig } from '../src/timers.js';
+import { moveRegionToGuild } from '../src/store.js';
+import { endsAt, formatMinutes, loadConfig, nextOccurrence, parseDuration, upcoming, validateConfig } from '../src/timers.js';
 
 const zone = 'Asia/Seoul';
 // Wednesday 2026-10-14 10:00 in Seoul
@@ -150,12 +151,13 @@ test('shipped config is valid and renders every group in every region', () => {
   }
 });
 
-test('one slash command per group, with region choices', () => {
+test('one slash command per group, and /region with region choices', () => {
   const config = loadConfig();
   const commands = buildCommandData(config);
-  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help'].sort());
-  const region = commands.find((c) => c.name === 'events').options.find((o) => o.name === 'region');
+  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'region', 'killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help'].sort());
+  const region = commands.find((c) => c.name === 'region');
   assert.deepEqual(region.options[0].choices.map((c) => c.value), Object.keys(config.regions));
+  assert.ok(!commands.find((c) => c.name === 'events').options.some((o) => o.name === 'region'));
 });
 
 test('missingPermissions names what the bot lacks in a channel', () => {
@@ -191,7 +193,7 @@ test('dueAlerts: fires once inside the lead time, never before or after the spaw
   assert.deepEqual(message.allowedMentions, { roles: ['42'] });
 });
 
-test('dueAlerts: uses the group region and respawn kills', () => {
+test('dueAlerts: uses the server region and respawn kills', () => {
   const config = {
     regions: { kr: { name: 'Korea', timezone: zone }, utc: { name: 'UTC', timezone: 'UTC' } },
     defaultRegion: 'kr',
@@ -205,7 +207,7 @@ test('dueAlerts: uses the group region and respawn kills', () => {
   // 10:50 Seoul = 01:50 UTC, so with the UTC region "11:00" is hours away.
   const t = DateTime.fromISO('2026-10-14T10:50', { zone });
   assert.deepEqual(dueAlerts(config, { groups: {}, kills: {}, alerts }, t).map((d) => d.timer.id), ['boss']);
-  assert.deepEqual(dueAlerts(config, { groups: { g: { region: 'utc' } }, kills: {}, alerts }, t), []);
+  assert.deepEqual(dueAlerts(config, { region: 'utc', groups: {}, kills: {}, alerts }, t), []);
   const kills = { field: t.minus({ minutes: 50 }).toMillis() };
   assert.deepEqual(dueAlerts(config, { groups: {}, kills, alerts }, t).map((d) => d.timer.id).sort(), ['boss', 'field']);
 });
@@ -250,5 +252,33 @@ test('help lists every command', () => {
   const { description } = helpEmbed(config).toJSON();
   for (const { name } of buildCommandData(config)) assert.match(description, new RegExp(`\\*\\*/${name}\\*\\*`));
   assert.match(description, /\*\*\/killed\*\* - .+\n`boss` `\[minutes_ago\]`/);
-  assert.match(description, /\*\*\/bosses\*\* - .+\n`show` `post` `stop` `region` `faction`/);
+  assert.match(description, /\*\*\/bosses\*\* - .+\n`show` `post` `stop` `faction`/);
+  assert.match(description, /\*\*\/region\*\* - .+\n`\[region\]`/);
+});
+
+test('parseDuration: the ways people write "spawns in"', () => {
+  for (const text of ['4h 25m', '4h25m', '4 hrs 25 mins', 'in 4 hours and 25 minutes', '4 hour, 25 min', '4:25', ' 4H 25M ']) {
+    assert.equal(parseDuration(text), 265, text);
+  }
+  assert.equal(parseDuration('90 min'), 90);
+  assert.equal(parseDuration('2 hours'), 120);
+  assert.equal(parseDuration('0m'), 0);
+  for (const text of ['90', 'soon', '4h and a bit', '4 days', '', '4:75']) assert.equal(parseDuration(text), null, text);
+});
+
+test('formatMinutes', () => {
+  assert.equal(formatMinutes(265), '4h 25m');
+  assert.equal(formatMinutes(720), '12h');
+  assert.equal(formatMinutes(30), '30m');
+  assert.equal(formatMinutes(0), '0m');
+});
+
+test('a region picked per group before becomes the server region', () => {
+  const guild = { groups: { events: { channelId: '1' }, bosses: { region: 'asia', faction: 'elyos' }, resets: { region: 'eu' } } };
+  moveRegionToGuild(guild);
+  assert.equal(guild.region, 'asia');
+  assert.deepEqual(guild.groups, { events: { channelId: '1' }, bosses: { faction: 'elyos' }, resets: {} });
+  const set = { region: 'na-east', groups: { bosses: { region: 'asia' } } };
+  moveRegionToGuild(set);
+  assert.equal(set.region, 'na-east');
 });

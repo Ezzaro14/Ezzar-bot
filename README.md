@@ -5,7 +5,7 @@ AION 2 global-server timers in Discord, shown in your local time.
 | Command | What |
 | --- | --- |
 | `/events` | Shugo Festival, Spacetime Rift, Dimensional Invasion, Artifact Siege |
-| `/bosses` | Siege bosses, Nahma, Watcher Kaira, Gartua, Dartan |
+| `/bosses` | Siege bosses, Nahma, Watcher Kaira, Gartua, Dartan, Lagta, Kashapa |
 | `/resets` | Daily and weekly reset |
 
 Each command has:
@@ -16,20 +16,18 @@ Each command has:
 
 ## Server region
 
-Each command has its own region, so `/events` and `/bosses` can use different ones.
+One region for the whole server, used by every timer, board and alert.
 
 | Command | What |
 | --- | --- |
-| `/events region` | Show the current region |
-| `/events region Europe` | Set the region |
-| `/bosses region NA East` | Same for bosses |
-| `/resets region Asia` | Same for resets |
+| `/region` | Show the current region |
+| `/region Europe` | Set the region |
 
 Regions: NA East, NA West, Europe, South America, Asia. Default: Europe.
 
 ## Faction
 
-`/bosses` only shows your faction's field bosses (Gartua, Dartan).
+`/bosses` only shows your faction's field bosses (Gartua, Dartan, Lagta, Kashapa).
 
 | Command | What |
 | --- | --- |
@@ -40,13 +38,16 @@ Default: Asmodian.
 
 ## Field bosses
 
-Gartua and Dartan respawn a set time after they die, so they start counting once someone
-records the kill:
+Gartua, Dartan, Lagta and Kashapa respawn a set time after they die, so they start counting
+once someone records the kill, or how long is left until the respawn:
 
 | Command | What |
 | --- | --- |
 | `/killed Eternal Gartua` | Killed just now |
-| `/killed Silent Dartan (Altgard) minutes_ago:20` | Killed 20 minutes ago |
+| `/killed Silent Dartan minutes_ago:20` | Killed 20 minutes ago |
+| `/killed High Commander Lagta spawns_in:4h 25m` | Respawns in 4 hours 25 minutes |
+
+`spawns_in` also understands `4 hrs 25 mins`, `4 hours and 25 minutes`, `90 min` and `4:25`.
 
 ## Alerts
 

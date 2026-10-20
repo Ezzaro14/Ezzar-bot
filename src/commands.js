@@ -16,9 +16,9 @@ import { DEFAULT_MINUTES_BEFORE } from './alerts.js';
 import { MAX_REMINDERS, normalizeZone, parseReminder, zoneChoices } from './reminders.js';
 import { buildBoard } from './render.js';
 import { factionFor, groupState, guildState, regionFor, saveState } from './store.js';
-import { hasFactions, shownFor } from './timers.js';
+import { formatMinutes, hasFactions, parseDuration, shownFor } from './timers.js';
 
-/** One command per timer group (e.g. /events, /bosses), plus /killed, /alerts, /remindme, /reminders, /tempvoice, /invite and /help. */
+/** One command per timer group (e.g. /events, /bosses), plus /region, /killed, /alerts, /remindme, /reminders, /tempvoice, /invite and /help. */
 export function buildCommandData(config) {
   const regionChoices = Object.entries(config.regions).map(([value, region]) => ({ name: region.name, value }));
 
@@ -41,18 +41,7 @@ export function buildCommandData(config) {
               .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
           ),
       )
-      .addSubcommand((sub) => sub.setName('stop').setDescription('Stop updating the board'))
-      .addSubcommand((sub) =>
-        sub
-          .setName('region')
-          .setDescription(`Show or set the server region used for ${group.name.toLowerCase()}`)
-          .addStringOption((opt) =>
-            opt
-              .setName('region')
-              .setDescription('New region (leave empty to see the current one)')
-              .addChoices(...regionChoices),
-          ),
-      );
+      .addSubcommand((sub) => sub.setName('stop').setDescription('Stop updating the board'));
     if (hasFactions(config, id)) {
       command.addSubcommand((sub) =>
         sub
@@ -69,6 +58,14 @@ export function buildCommandData(config) {
     return command;
   });
 
+  const region = new SlashCommandBuilder()
+    .setName('region')
+    .setDescription('Show or set the game server region, used for all timers')
+    .setDMPermission(false)
+    .addStringOption((opt) =>
+      opt.setName('region').setDescription('New region (leave empty to see the current one)').addChoices(...regionChoices),
+    );
+
   const killed = new SlashCommandBuilder()
     .setName('killed')
     .setDescription('Record a boss kill to start its respawn timer')
@@ -76,6 +73,9 @@ export function buildCommandData(config) {
     .addStringOption((opt) => opt.setName('boss').setDescription('Which boss').setRequired(true).setAutocomplete(true))
     .addIntegerOption((opt) =>
       opt.setName('minutes_ago').setDescription('How long ago it died (default: just now)').setMinValue(0),
+    )
+    .addStringOption((opt) =>
+      opt.setName('spawns_in').setDescription('Or: how long until it respawns, e.g. "4h 25m"').setMaxLength(50),
     );
 
   const timerOption = (opt) =>
@@ -157,7 +157,7 @@ export function buildCommandData(config) {
 
   const help = new SlashCommandBuilder().setName('help').setDescription('List all commands');
 
-  return [...groupCommands, killed, alerts, remindme, reminders, tempvoice, invite, help].map((command) => command.toJSON());
+  return [...groupCommands, region, killed, alerts, remindme, reminders, tempvoice, invite, help].map((command) => command.toJSON());
 }
 
 /** /help: every command with its subcommands or options, built from the command definitions. */
@@ -181,8 +181,17 @@ const canManage = (interaction) => interaction.memberPermissions?.has(Permission
 const ephemeral = (content) => ({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 const NEED_MANAGE = 'You need the Manage Server permission.';
 
-/** Name plus location, so bosses that share a name (e.g. both Silent Dartans) can be told apart. */
-const timerLabel = (timer) => (timer.location ? `${timer.name} (${timer.location})` : timer.name);
+/**
+ * Choices for a list of timers: just the name, plus the location only when two in the list share a name
+ * (e.g. both factions' Silent Dartan, which /alerts remove can list together).
+ */
+function timerChoices(timers) {
+  const shared = (timer) => timers.filter((t) => t.name === timer.name).length > 1;
+  return timers.map((t) => ({
+    name: (shared(t) && t.location ? `${t.name} (${t.location})` : t.name).slice(0, 100),
+    value: t.id,
+  }));
+}
 
 // What the bot needs in a channel to post a board there; alerts are plain text and skip Embed Links.
 const REQUIRED = [
@@ -261,14 +270,34 @@ export async function handleInteraction(interaction, ctx) {
   if (interaction.commandName === 'killed') {
     const timer = ctx.config.timers.find((t) => t.type === 'respawn' && t.id === interaction.options.getString('boss'));
     if (!timer) return interaction.reply(ephemeral('Unknown boss. Pick one from the list.'));
-    const minutesAgo = interaction.options.getInteger('minutes_ago') ?? 0;
-    guild.kills[timer.id] = Date.now() - minutesAgo * 60_000;
+    const minutesAgo = interaction.options.getInteger('minutes_ago');
+    const spawnsInText = interaction.options.getString('spawns_in');
+    if (minutesAgo != null && spawnsInText) {
+      return interaction.reply(ephemeral('Use either `minutes_ago` or `spawns_in`, not both.'));
+    }
+    let killedAt = Date.now() - (minutesAgo ?? 0) * 60_000;
+    if (spawnsInText) {
+      const spawnsIn = parseDuration(spawnsInText);
+      if (spawnsIn == null) {
+        return interaction.reply(ephemeral(`I couldn't read "${spawnsInText}". Write it like \`4h 25m\` or \`4 hrs 25 mins\`.`));
+      }
+      if (spawnsIn > timer.respawnMinutes) {
+        return interaction.reply(
+          ephemeral(`**${timer.name}** respawns ${formatMinutes(timer.respawnMinutes)} after a kill, so it can't be ${formatMinutes(spawnsIn)} away.`),
+        );
+      }
+      // Stored as the kill time that gives this respawn, like any other kill.
+      killedAt = Date.now() + (spawnsIn - timer.respawnMinutes) * 60_000;
+    }
+    guild.kills[timer.id] = killedAt;
     saveState(ctx.state);
     await ctx.refreshGuild(interaction.guildId, timer.group);
-    const respawn = Math.floor((guild.kills[timer.id] + timer.respawnMinutes * 60_000) / 1000);
-    return interaction.reply(`**${timerLabel(timer)}** killed. Respawns <t:${respawn}:F> (<t:${respawn}:R>).`);
+    const respawn = Math.floor((killedAt + timer.respawnMinutes * 60_000) / 1000);
+    const what = spawnsInText ? 'respawn time set' : 'killed';
+    return interaction.reply(`**${timer.name}** ${what}. Respawns <t:${respawn}:F> (<t:${respawn}:R>).`);
   }
 
+  if (interaction.commandName === 'region') return handleRegion(interaction, ctx, guild);
   if (interaction.commandName === 'alerts') return handleAlerts(interaction, ctx, guild);
   if (interaction.commandName === 'tempvoice') return handleTempVoice(interaction, ctx, guild);
 
@@ -279,7 +308,7 @@ export async function handleInteraction(interaction, ctx) {
   const board = () =>
     buildBoard(ctx.config, {
       group: groupId,
-      region: regionFor(ctx.config, settings),
+      region: regionFor(ctx.config, guild),
       faction: factionFor(ctx.config, settings),
       kills: guild.kills,
       intervalMinutes: ctx.intervalMinutes,
@@ -316,20 +345,6 @@ export async function handleInteraction(interaction, ctx) {
       return interaction.reply(ephemeral(`${group.name} board removed.`));
     }
 
-    case 'region': {
-      const region = interaction.options.getString('region');
-      if (!region) {
-        const current = ctx.config.regions[regionFor(ctx.config, settings)];
-        return interaction.reply(ephemeral(`${group.name} use the **${current.name}** region.`));
-      }
-      if (!canManage(interaction)) return interaction.reply(ephemeral(NEED_MANAGE));
-      if (!ctx.config.regions[region]) return interaction.reply(ephemeral('Unknown region. Pick one from the list.'));
-      settings.region = region;
-      saveState(ctx.state);
-      await ctx.refreshGuild(interaction.guildId, groupId);
-      return interaction.reply(ephemeral(`${group.name} now use the **${ctx.config.regions[region].name}** region.`));
-    }
-
     case 'faction': {
       const faction = interaction.options.getString('faction');
       if (!faction) {
@@ -362,7 +377,7 @@ async function handleAlerts(interaction, ctx, guild) {
   if (sub === 'list') {
     const lines = Object.entries(guild.alerts).map(([timerId, alert]) => {
       const timer = ctx.config.timers.find((t) => t.id === timerId);
-      const name = timer ? timerLabel(timer) : timerId;
+      const name = timer ? timer.name : timerId;
       return `**${name}** - <@&${alert.roleId}> in <#${alert.channelId}>, ${alert.minutesBefore} min before`;
     });
     return interaction.reply(ephemeral(lines.length ? lines.join('\n') : 'No alerts set. Add one with `/alerts set`.'));
@@ -373,10 +388,10 @@ async function handleAlerts(interaction, ctx, guild) {
   if (!timer) return interaction.reply(ephemeral('Unknown boss or event. Pick one from the list.'));
 
   if (sub === 'remove') {
-    if (!guild.alerts[timer.id]) return interaction.reply(ephemeral(`There's no alert for **${timerLabel(timer)}**.`));
+    if (!guild.alerts[timer.id]) return interaction.reply(ephemeral(`There's no alert for **${timer.name}**.`));
     delete guild.alerts[timer.id];
     saveState(ctx.state);
-    return interaction.reply(ephemeral(`Alert for **${timerLabel(timer)}** removed.`));
+    return interaction.reply(ephemeral(`Alert for **${timer.name}** removed.`));
   }
 
   // set
@@ -400,9 +415,24 @@ async function handleAlerts(interaction, ctx, guild) {
   }
   return interaction.reply(
     ephemeral(
-      [`I'll ping ${role} in ${channel} ${minutesBefore} min before **${timerLabel(timer)}** spawns.`, ...notes].join('\n'),
+      [`I'll ping ${role} in ${channel} ${minutesBefore} min before **${timer.name}** spawns.`, ...notes].join('\n'),
     ),
   );
+}
+
+/** /region: one region for every timer in the server. */
+async function handleRegion(interaction, ctx, guild) {
+  const region = interaction.options.getString('region');
+  if (!region) {
+    const current = ctx.config.regions[regionFor(ctx.config, guild)];
+    return interaction.reply(ephemeral(`Timers use the **${current.name}** region.`));
+  }
+  if (!canManage(interaction)) return interaction.reply(ephemeral(NEED_MANAGE));
+  if (!ctx.config.regions[region]) return interaction.reply(ephemeral('Unknown region. Pick one from the list.'));
+  guild.region = region;
+  saveState(ctx.state);
+  await ctx.refreshGuild(interaction.guildId);
+  return interaction.reply(ephemeral(`All timers now use the **${ctx.config.regions[region].name}** region.`));
 }
 
 async function handleTempVoice(interaction, ctx, guild) {
@@ -542,9 +572,8 @@ function autocompleteTimer(interaction, ctx) {
     timers = timers.filter((t) => shownFor(t, factionFor(ctx.config, guild.groups[t.group])));
     if (interaction.commandName === 'killed') timers = timers.filter((t) => t.type === 'respawn');
   }
-  const choices = timers
-    .filter((t) => timerLabel(t).toLowerCase().includes(query))
-    .slice(0, 25)
-    .map((t) => ({ name: timerLabel(t).slice(0, 100), value: t.id }));
+  const choices = timerChoices(timers)
+    .filter((choice) => choice.name.toLowerCase().includes(query))
+    .slice(0, 25);
   return interaction.respond(choices);
 }

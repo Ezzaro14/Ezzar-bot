@@ -19,7 +19,7 @@
     },
     "bosses": {
       "name": "World Bosses",
-      "description": "Siege bosses, Nahma, Watcher Kaira, Gartua and Dartan"
+      "description": "Siege bosses, Nahma, Watcher Kaira, Gartua, Dartan, Lagta and Kashapa"
     },
     "resets": {
       "name": "Resets",
@@ -162,6 +162,42 @@
       "type": "respawn",
       "respawnMinutes": 360,
       "location": "Altgard · Forest of Purification"
+    },
+    {
+      "id": "high-commander-lagta-verteron",
+      "faction": "elyos",
+      "name": "High Commander Lagta",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 720,
+      "location": "Verteron · Red Forest"
+    },
+    {
+      "id": "high-commander-lagta-altgard",
+      "faction": "asmodian",
+      "name": "High Commander Lagta",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 720,
+      "location": "Altgard · Ragta Fortress"
+    },
+    {
+      "id": "soul-ruler-kashapa-verteron",
+      "faction": "elyos",
+      "name": "Soul Ruler Kashapa",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 360,
+      "location": "Verteron · Artamia Plateau East"
+    },
+    {
+      "id": "soul-ruler-kashapa-altgard",
+      "faction": "asmodian",
+      "name": "Soul Ruler Kashapa",
+      "group": "bosses",
+      "type": "respawn",
+      "respawnMinutes": 360,
+      "location": "Altgard · Pafnite Burial Ground"
     },
     {
       "id": "daily-reset",

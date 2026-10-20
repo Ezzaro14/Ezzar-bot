@@ -4,7 +4,7 @@ import { DateTime } from 'luxon';
 const WEEKDAYS = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
 // Slash command names; a group's key becomes its command, so it must fit and not collide.
 const COMMAND_NAME = /^[a-z0-9_-]{1,32}$/;
-const RESERVED_COMMANDS = new Set(['killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help']);
+const RESERVED_COMMANDS = new Set(['region', 'killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help']);
 
 export function loadConfig(path = new URL('../config/timers.json', import.meta.url)) {
   const config = JSON.parse(readFileSync(path, 'utf8'));
@@ -34,7 +34,7 @@ export function validateConfig(config) {
 
   for (const [id, group] of Object.entries(config.groups ?? {})) {
     if (!COMMAND_NAME.test(id) || RESERVED_COMMANDS.has(id)) {
-      throw new Error(`Group "${id}" can't be used as a command name (lowercase letters, digits, - or _; not "killed", "alerts", "remindme", "reminders", "tempvoice", "invite" or "help")`);
+      throw new Error(`Group "${id}" can't be used as a command name (lowercase letters, digits, - or _; not "region", "killed", "alerts", "remindme", "reminders", "tempvoice", "invite" or "help")`);
     }
     if (!group.name) throw new Error(`Group ${id} needs a name`);
     if (!group.description || group.description.length > 100) {
@@ -191,3 +191,22 @@ export function upcoming(config, { group, region, faction, now = DateTime.utc(),
     }))
     .sort((a, b) => (a.next?.toMillis() ?? Infinity) - (b.next?.toMillis() ?? Infinity));
 }
+
+const DURATION_PART = /(\d+)\s*(hours?|hrs?|h|minutes?|mins?|m)(?![a-z])/g;
+
+/** Minutes in "4h 25m", "4 hrs 25 mins", "in 4 hours and 25 minutes", "90 min" or "4:25"; null if it can't be read. */
+export function parseDuration(text) {
+  const input = text.trim().toLowerCase().replace(/^in\s+/, '');
+  const clock = /^(\d+):([0-5]\d)$/.exec(input);
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2]);
+  const parts = [...input.matchAll(DURATION_PART)];
+  // Anything besides the parts, spaces, commas and "and" means it's not a duration.
+  const rest = input.replace(DURATION_PART, '').replace(/\band\b|,/g, '').trim();
+  if (!parts.length || rest) return null;
+  return parts.reduce((sum, [, n, unit]) => sum + Number(n) * (unit.startsWith('h') ? 60 : 1), 0);
+}
+
+/** 265 -> "4h 25m". */
+export const formatMinutes = (minutes) =>
+  [Math.floor(minutes / 60) && `${Math.floor(minutes / 60)}h`, minutes % 60 && `${minutes % 60}m`].filter(Boolean).join(' ') ||
+  '0m';

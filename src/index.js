@@ -38,7 +38,7 @@ async function refreshBoard(guildId, groupId) {
     const channel = await client.channels.fetch(settings.channelId);
     const embed = buildBoard(config, {
       group: groupId,
-      region: regionFor(config, settings),
+      region: regionFor(config, guild),
       faction: factionFor(config, settings),
       kills: guild.kills,
       intervalMinutes,
