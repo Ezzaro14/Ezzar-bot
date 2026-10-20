@@ -5,7 +5,8 @@ AION 2 global-server timers in Discord, shown in your local time.
 | Command | What |
 | --- | --- |
 | `/events` | Shugo Festival, Spacetime Rift, Dimensional Invasion, Artifact Siege |
-| `/bosses` | Siege bosses, Nahma, Watcher Kaira, Gartua, Dartan, Lagta, Kashapa |
+| `/bosses` | Abyss bosses: siege bosses, Nahma, Watcher Kaira |
+| `/fieldbosses` | Gartua, Dartan, Lagta, Kashapa in your faction's home map |
 | `/resets` | Daily and weekly reset |
 
 Each command has:
@@ -27,12 +28,12 @@ Regions: NA East, NA West, Europe, South America, Asia. Default: Europe.
 
 ## Faction
 
-`/bosses` only shows your faction's field bosses (Gartua, Dartan, Lagta, Kashapa).
+`/fieldbosses`, `/killed` and alerts only show your faction's field bosses.
 
 | Command | What |
 | --- | --- |
-| `/bosses faction` | Show the current faction |
-| `/bosses faction Elyos` | Switch faction |
+| `/faction` | Show the current faction |
+| `/faction Elyos` | Switch faction |
 
 Default: Asmodian.
 

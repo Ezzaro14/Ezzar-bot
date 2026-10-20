@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url));
 
 // state = { guilds: { [guildId]: {
-//   region,
+//   region, faction,
 //   kills: { [timerId]: epochMs },
-//   groups: { [groupId]: { faction, channelId, messageId } },
+//   groups: { [groupId]: { channelId, messageId } },
 //   alerts: { [timerId]: { roleId, channelId, minutesBefore, sentFor } },
 //   tempVoice: { hubId, channels: [channelId] },
 // } },
@@ -23,16 +23,18 @@ export function loadState() {
   }
   state.reminders ??= [];
   state.users ??= {};
-  for (const guild of Object.values(state.guilds)) moveRegionToGuild(guild);
+  for (const guild of Object.values(state.guilds)) moveGroupSettingsToGuild(guild);
   return state;
 }
 
-/** The region used to be set per group; it's now one per server. Keeps the first one a server had picked. */
-export function moveRegionToGuild(guild) {
+/** Region and faction used to be set per group; they're now one per server. Keeps the first one a server had picked. */
+export function moveGroupSettingsToGuild(guild) {
   for (const settings of Object.values(guild.groups ?? {})) {
-    if (!settings.region) continue;
-    guild.region ??= settings.region;
-    delete settings.region;
+    for (const key of ['region', 'faction']) {
+      if (!settings[key]) continue;
+      guild[key] ??= settings[key];
+      delete settings[key];
+    }
   }
 }
 
@@ -61,8 +63,8 @@ export function regionFor(config, guild) {
   return config.regions[guild?.region] ? guild.region : config.defaultRegion;
 }
 
-/** The faction a guild picked for a group, like regionFor; null when the config has no factions. */
-export function factionFor(config, settings) {
+/** The faction a guild picked, like regionFor; null when the config has no factions. */
+export function factionFor(config, guild) {
   if (!config.factions) return null;
-  return config.factions[settings?.faction] ? settings.faction : config.defaultFaction;
+  return config.factions[guild?.faction] ? guild.faction : config.defaultFaction;
 }

@@ -39,7 +39,7 @@ async function refreshBoard(guildId, groupId) {
     const embed = buildBoard(config, {
       group: groupId,
       region: regionFor(config, guild),
-      faction: factionFor(config, settings),
+      faction: factionFor(config, guild),
       kills: guild.kills,
       intervalMinutes,
     });

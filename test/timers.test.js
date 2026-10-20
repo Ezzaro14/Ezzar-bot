@@ -5,7 +5,7 @@ import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { alertMessage, dueAlerts } from '../src/alerts.js';
 import { buildCommandData, helpEmbed, missingPermissions } from '../src/commands.js';
 import { buildBoard } from '../src/render.js';
-import { moveRegionToGuild } from '../src/store.js';
+import { moveGroupSettingsToGuild } from '../src/store.js';
 import { endsAt, formatMinutes, loadConfig, nextOccurrence, parseDuration, upcoming, validateConfig } from '../src/timers.js';
 
 const zone = 'Asia/Seoul';
@@ -146,7 +146,8 @@ test('shipped config is valid and renders every group in every region', () => {
     for (const region of Object.keys(config.regions)) {
       const embed = buildBoard(config, { group, region, now }).toJSON();
       assert.match(embed.title, new RegExp(config.regions[region].name));
-      assert.match(embed.description, /^\*\*.+\*\* - <t:\d+:R> · <t:\d+:[tF]>/m);
+      // Field bosses have no time until a kill is recorded.
+      assert.match(embed.description, /^\*\*.+\*\* - (<t:\d+:R> · <t:\d+:[tF]>|Not tracked)/m);
     }
   }
 });
@@ -154,7 +155,7 @@ test('shipped config is valid and renders every group in every region', () => {
 test('one slash command per group, and /region with region choices', () => {
   const config = loadConfig();
   const commands = buildCommandData(config);
-  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'region', 'killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help'].sort());
+  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'region', 'faction', 'killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help'].sort());
   const region = commands.find((c) => c.name === 'region');
   assert.deepEqual(region.options[0].choices.map((c) => c.value), Object.keys(config.regions));
   assert.ok(!commands.find((c) => c.name === 'events').options.some((o) => o.name === 'region'));
@@ -236,12 +237,12 @@ test('factions: boards, commands and alerts only include the picked faction', ()
   assert.match(buildBoard(config, { group: 'g', region: 'kr', faction: 'a', now }).toJSON().title, /Korea · Asmodian$/);
   assert.doesNotMatch(buildBoard(config, { group: 'other', region: 'kr', faction: 'a', now }).toJSON().title, /Asmodian/);
 
-  const subcommands = (name) => buildCommandData(config).find((c) => c.name === name).options.map((o) => o.name);
-  assert.ok(subcommands('g').includes('faction'));
-  assert.ok(!subcommands('other').includes('faction'));
+  const names = (c) => buildCommandData(c).map((command) => command.name);
+  assert.ok(names(config).includes('faction'));
+  assert.ok(!names({ ...config, factions: undefined, defaultFaction: undefined, timers: [config.timers[0]] }).includes('faction'));
 
   const alert = { roleId: '1', channelId: '1', minutesBefore: 15 };
-  const guild = (faction) => ({ groups: { g: { faction } }, kills: {}, alerts: { asmo: { ...alert }, ely: { ...alert } } });
+  const guild = (faction) => ({ faction, groups: {}, kills: {}, alerts: { asmo: { ...alert }, ely: { ...alert } } });
   const t = DateTime.fromISO('2026-10-14T10:50', { zone });
   assert.deepEqual(dueAlerts(config, guild(undefined), t).map((d) => d.timer.id), ['asmo']);
   assert.deepEqual(dueAlerts(config, guild('e'), t).map((d) => d.timer.id), ['ely']);
@@ -252,7 +253,8 @@ test('help lists every command', () => {
   const { description } = helpEmbed(config).toJSON();
   for (const { name } of buildCommandData(config)) assert.match(description, new RegExp(`\\*\\*/${name}\\*\\*`));
   assert.match(description, /\*\*\/killed\*\* - .+\n`boss` `\[minutes_ago\]`/);
-  assert.match(description, /\*\*\/bosses\*\* - .+\n`show` `post` `stop` `faction`/);
+  assert.match(description, /\*\*\/bosses\*\* - .+\n`show` `post` `stop`\n/);
+  assert.match(description, /\*\*\/faction\*\* - .+\n`\[faction\]`/);
   assert.match(description, /\*\*\/region\*\* - .+\n`\[region\]`/);
 });
 
@@ -273,12 +275,13 @@ test('formatMinutes', () => {
   assert.equal(formatMinutes(0), '0m');
 });
 
-test('a region picked per group before becomes the server region', () => {
+test('a region or faction picked per group before becomes the server one', () => {
   const guild = { groups: { events: { channelId: '1' }, bosses: { region: 'asia', faction: 'elyos' }, resets: { region: 'eu' } } };
-  moveRegionToGuild(guild);
+  moveGroupSettingsToGuild(guild);
   assert.equal(guild.region, 'asia');
-  assert.deepEqual(guild.groups, { events: { channelId: '1' }, bosses: { faction: 'elyos' }, resets: {} });
+  assert.equal(guild.faction, 'elyos');
+  assert.deepEqual(guild.groups, { events: { channelId: '1' }, bosses: {}, resets: {} });
   const set = { region: 'na-east', groups: { bosses: { region: 'asia' } } };
-  moveRegionToGuild(set);
+  moveGroupSettingsToGuild(set);
   assert.equal(set.region, 'na-east');
 });

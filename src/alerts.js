@@ -9,7 +9,7 @@ const ts = (dt, style) => `<t:${Math.floor(dt.toSeconds())}:${style}>`;
 /**
  * Alerts that should fire now: the timer's next spawn (in the guild's region)
  * is within `minutesBefore`, and this spawn hasn't been announced yet. Bosses of the faction
- * the guild didn't pick for that group are skipped.
+ * the guild didn't pick are skipped.
  * guild.alerts = { [timerId]: { roleId, channelId, minutesBefore, sentFor } }, sentFor = announced spawn (epoch ms).
  */
 export function dueAlerts(config, guild, now = DateTime.utc()) {
@@ -17,8 +17,7 @@ export function dueAlerts(config, guild, now = DateTime.utc()) {
   for (const [timerId, alert] of Object.entries(guild.alerts ?? {})) {
     const timer = config.timers.find((t) => t.id === timerId);
     if (!timer) continue;
-    const settings = guild.groups?.[timer.group];
-    if (!shownFor(timer, factionFor(config, settings))) continue;
+    if (!shownFor(timer, factionFor(config, guild))) continue;
     const zone = config.regions[regionFor(config, guild)].timezone;
     const next = nextOccurrence(timer, { now, zone, kills: guild.kills });
     if (!next || next <= now) continue;

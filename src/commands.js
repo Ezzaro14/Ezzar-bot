@@ -16,16 +16,16 @@ import { DEFAULT_MINUTES_BEFORE } from './alerts.js';
 import { MAX_REMINDERS, normalizeZone, parseReminder, zoneChoices } from './reminders.js';
 import { buildBoard } from './render.js';
 import { factionFor, groupState, guildState, regionFor, saveState } from './store.js';
-import { formatMinutes, hasFactions, parseDuration, shownFor } from './timers.js';
+import { formatMinutes, parseDuration, shownFor } from './timers.js';
 
-/** One command per timer group (e.g. /events, /bosses), plus /region, /killed, /alerts, /remindme, /reminders, /tempvoice, /invite and /help. */
+/** One command per timer group (e.g. /events, /bosses), plus /region, /faction (if configured), /killed, /alerts, /remindme, /reminders, /tempvoice, /invite and /help. */
 export function buildCommandData(config) {
   const regionChoices = Object.entries(config.regions).map(([value, region]) => ({ name: region.name, value }));
 
   const factionChoices = Object.entries(config.factions ?? {}).map(([value, faction]) => ({ name: faction.name, value }));
 
-  const groupCommands = Object.entries(config.groups).map(([id, group]) => {
-    const command = new SlashCommandBuilder()
+  const groupCommands = Object.entries(config.groups).map(([id, group]) =>
+    new SlashCommandBuilder()
       .setName(id)
       .setDescription(group.description)
       .setDMPermission(false)
@@ -41,22 +41,8 @@ export function buildCommandData(config) {
               .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
           ),
       )
-      .addSubcommand((sub) => sub.setName('stop').setDescription('Stop updating the board'));
-    if (hasFactions(config, id)) {
-      command.addSubcommand((sub) =>
-        sub
-          .setName('faction')
-          .setDescription(`Show or set which faction's ${group.name.toLowerCase()} to show`)
-          .addStringOption((opt) =>
-            opt
-              .setName('faction')
-              .setDescription('New faction (leave empty to see the current one)')
-              .addChoices(...factionChoices),
-          ),
-      );
-    }
-    return command;
-  });
+      .addSubcommand((sub) => sub.setName('stop').setDescription('Stop updating the board')),
+  );
 
   const region = new SlashCommandBuilder()
     .setName('region')
@@ -64,6 +50,15 @@ export function buildCommandData(config) {
     .setDMPermission(false)
     .addStringOption((opt) =>
       opt.setName('region').setDescription('New region (leave empty to see the current one)').addChoices(...regionChoices),
+    );
+
+  // Timers with a "faction" (the field bosses) only show for the faction a server picks.
+  const faction = new SlashCommandBuilder()
+    .setName('faction')
+    .setDescription('Show or set your faction, used for its field bosses')
+    .setDMPermission(false)
+    .addStringOption((opt) =>
+      opt.setName('faction').setDescription('New faction (leave empty to see the current one)').addChoices(...factionChoices),
     );
 
   const killed = new SlashCommandBuilder()
@@ -157,7 +152,8 @@ export function buildCommandData(config) {
 
   const help = new SlashCommandBuilder().setName('help').setDescription('List all commands');
 
-  return [...groupCommands, region, killed, alerts, remindme, reminders, tempvoice, invite, help].map((command) => command.toJSON());
+  const factionCommands = config.factions ? [faction] : [];
+  return [...groupCommands, region, ...factionCommands, killed, alerts, remindme, reminders, tempvoice, invite, help].map((command) => command.toJSON());
 }
 
 /** /help: every command with its subcommands or options, built from the command definitions. */
@@ -298,6 +294,7 @@ export async function handleInteraction(interaction, ctx) {
   }
 
   if (interaction.commandName === 'region') return handleRegion(interaction, ctx, guild);
+  if (interaction.commandName === 'faction') return handleFaction(interaction, ctx, guild);
   if (interaction.commandName === 'alerts') return handleAlerts(interaction, ctx, guild);
   if (interaction.commandName === 'tempvoice') return handleTempVoice(interaction, ctx, guild);
 
@@ -309,7 +306,7 @@ export async function handleInteraction(interaction, ctx) {
     buildBoard(ctx.config, {
       group: groupId,
       region: regionFor(ctx.config, guild),
-      faction: factionFor(ctx.config, settings),
+      faction: factionFor(ctx.config, guild),
       kills: guild.kills,
       intervalMinutes: ctx.intervalMinutes,
     });
@@ -345,19 +342,6 @@ export async function handleInteraction(interaction, ctx) {
       return interaction.reply(ephemeral(`${group.name} board removed.`));
     }
 
-    case 'faction': {
-      const faction = interaction.options.getString('faction');
-      if (!faction) {
-        const current = ctx.config.factions[factionFor(ctx.config, settings)];
-        return interaction.reply(ephemeral(`${group.name} show **${current.name}** bosses.`));
-      }
-      if (!canManage(interaction)) return interaction.reply(ephemeral(NEED_MANAGE));
-      if (!ctx.config.factions?.[faction]) return interaction.reply(ephemeral('Unknown faction. Pick one from the list.'));
-      settings.faction = faction;
-      saveState(ctx.state);
-      await ctx.refreshGuild(interaction.guildId, groupId);
-      return interaction.reply(ephemeral(`${group.name} now show **${ctx.config.factions[faction].name}** bosses.`));
-    }
   }
 }
 
@@ -433,6 +417,21 @@ async function handleRegion(interaction, ctx, guild) {
   saveState(ctx.state);
   await ctx.refreshGuild(interaction.guildId);
   return interaction.reply(ephemeral(`All timers now use the **${ctx.config.regions[region].name}** region.`));
+}
+
+/** /faction: which faction's field bosses the server sees. */
+async function handleFaction(interaction, ctx, guild) {
+  const faction = interaction.options.getString('faction');
+  if (!faction) {
+    const current = ctx.config.factions[factionFor(ctx.config, guild)];
+    return interaction.reply(ephemeral(`This server shows **${current.name}** field bosses.`));
+  }
+  if (!canManage(interaction)) return interaction.reply(ephemeral(NEED_MANAGE));
+  if (!ctx.config.factions?.[faction]) return interaction.reply(ephemeral('Unknown faction. Pick one from the list.'));
+  guild.faction = faction;
+  saveState(ctx.state);
+  await ctx.refreshGuild(interaction.guildId);
+  return interaction.reply(ephemeral(`This server now shows **${ctx.config.factions[faction].name}** field bosses.`));
 }
 
 async function handleTempVoice(interaction, ctx, guild) {
@@ -559,7 +558,7 @@ function autocompleteReminders(interaction, ctx) {
 }
 
 /**
- * /killed: respawn bosses. /alerts set: everything. Both only list the faction picked for the timer's group.
+ * /killed: respawn bosses. /alerts set: everything. Both only list the server's faction.
  * /alerts remove: timers with an alert.
  */
 function autocompleteTimer(interaction, ctx) {
@@ -569,7 +568,7 @@ function autocompleteTimer(interaction, ctx) {
   if (interaction.commandName === 'alerts' && interaction.options.getSubcommand() === 'remove') {
     timers = timers.filter((t) => guild.alerts[t.id]);
   } else {
-    timers = timers.filter((t) => shownFor(t, factionFor(ctx.config, guild.groups[t.group])));
+    timers = timers.filter((t) => shownFor(t, factionFor(ctx.config, guild)));
     if (interaction.commandName === 'killed') timers = timers.filter((t) => t.type === 'respawn');
   }
   const choices = timerChoices(timers)
