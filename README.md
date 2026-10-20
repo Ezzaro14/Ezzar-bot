@@ -61,6 +61,36 @@ Ping a role before a boss or event spawns.
 
 The role must allow @mentions (Server Settings → Roles → Allow anyone to @mention this role).
 
+## Reminders
+
+Personal reminders, sent to you by DM (or in the channel you set them in, if your DMs are closed).
+
+| Command | What |
+| --- | --- |
+| `/remindme in 12 hours to wash dishes` | Remind you in 12 hours |
+| `/remindme at 2pm tuesday to fix my car` | Remind you at a clock time |
+| `/reminders list` | Show your reminders |
+| `/reminders cancel` | Cancel one |
+| `/reminders timezone Europe/Berlin` | Set your time zone |
+
+Clock times like "at 2pm" need your time zone, so set it once with `/reminders timezone`.
+Relative times like "in 12 hours" work without it. Up to 25 reminders, at most a year ahead.
+
+## Temporary voice channels
+
+Pick a voice channel to act as a lobby. Whoever joins it gets their own voice channel, in the
+same category and with the same permissions, and is moved into it. The channel is deleted once
+everyone has left.
+
+| Command | What |
+| --- | --- |
+| `/tempvoice set #Create-channel` | Joining #Create-channel makes a new voice channel |
+| `/tempvoice show` | Show which channel does that |
+| `/tempvoice off` | Turn it off |
+
+The bot needs **Manage Channels**, **Move Members** and **Connect**. Servers that added it before
+this feature need to give its role those; `/tempvoice set` says what's missing.
+
 ## Other
 
 | Command | What |
@@ -68,4 +98,4 @@ The role must allow @mentions (Server Settings → Roles → Allow anyone to @me
 | `/help` | List all commands |
 | `/invite` | Get a link to add the bot to your server |
 
-`post`, `stop`, setting a region or faction and changing alerts need **Manage Server**.
+`post`, `stop`, setting a region or faction, changing alerts and `/tempvoice set` or `off` need **Manage Server**.

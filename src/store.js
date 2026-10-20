@@ -8,14 +8,21 @@ const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url))
 //   kills: { [timerId]: epochMs },
 //   groups: { [groupId]: { region, faction, channelId, messageId } },
 //   alerts: { [timerId]: { roleId, channelId, minutesBefore, sentFor } },
-// } } }
+//   tempVoice: { hubId, channels: [channelId] },
+// } },
+//   reminders: [{ id, userId, channelId, at, text, createdAt }],  (at, createdAt: epoch ms)
+//   users: { [userId]: { timezone } } }
 export function loadState() {
+  let state;
   try {
-    return JSON.parse(readFileSync(STATE_PATH, 'utf8'));
+    state = JSON.parse(readFileSync(STATE_PATH, 'utf8'));
   } catch (err) {
-    if (err.code === 'ENOENT') return { guilds: {} };
-    throw err;
+    if (err.code !== 'ENOENT') throw err;
+    state = { guilds: {} };
   }
+  state.reminders ??= [];
+  state.users ??= {};
+  return state;
 }
 
 export function saveState(state) {

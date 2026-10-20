@@ -153,7 +153,7 @@ test('shipped config is valid and renders every group in every region', () => {
 test('one slash command per group, with region choices', () => {
   const config = loadConfig();
   const commands = buildCommandData(config);
-  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed', 'alerts', 'invite', 'help'].sort());
+  assert.deepEqual(commands.map((c) => c.name).sort(), [...Object.keys(config.groups), 'killed', 'alerts', 'remindme', 'reminders', 'tempvoice', 'invite', 'help'].sort());
   const region = commands.find((c) => c.name === 'events').options.find((o) => o.name === 'region');
   assert.deepEqual(region.options[0].choices.map((c) => c.value), Object.keys(config.regions));
 });

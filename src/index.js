@@ -2,8 +2,10 @@ import 'dotenv/config';
 import { Client, Events, GatewayIntentBits, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import { alertMessage, dueAlerts } from './alerts.js';
 import { handleInteraction } from './commands.js';
+import { reminderMessage } from './reminders.js';
 import { buildBoard } from './render.js';
 import { factionFor, loadState, regionFor, saveState } from './store.js';
+import { cleanupTempChannels, onChannelDelete, onVoiceStateUpdate } from './tempvoice.js';
 import { loadConfig } from './timers.js';
 
 const token = process.env.DISCORD_TOKEN;
@@ -14,9 +16,10 @@ if (!token) {
 
 const intervalMinutes = Number(process.env.UPDATE_INTERVAL_MINUTES) || 5;
 const ALERT_CHECK_MS = 30_000;
+const REMINDER_CHECK_MS = 10_000;
 const config = loadConfig();
 const state = loadState();
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 
 /** Re-renders a guild's posted boards: one group's, or all of them. */
 async function refreshGuild(guildId, groupId) {
@@ -87,6 +90,33 @@ async function sendAlert(guildId, guild, due) {
   }
 }
 
+/** Sends reminders that are due; each is removed first, so it's sent at most once. */
+async function sendReminders() {
+  const now = Date.now();
+  const due = state.reminders.filter((r) => r.at <= now);
+  if (!due.length) return;
+  state.reminders = state.reminders.filter((r) => r.at > now);
+  saveState(state);
+  await Promise.all(due.map(sendReminder));
+}
+
+/** By DM; if the user doesn't accept DMs from the bot, in the channel the reminder was set in. */
+async function sendReminder(reminder) {
+  try {
+    const user = await client.users.fetch(reminder.userId);
+    await user.send(reminderMessage(reminder));
+    return;
+  } catch (err) {
+    console.warn(`Couldn't DM reminder to user ${reminder.userId}, trying its channel:`, err.message);
+  }
+  try {
+    const channel = await client.channels.fetch(reminder.channelId);
+    await channel.send(reminderMessage(reminder, { mention: true }));
+  } catch (err) {
+    console.error(`Failed to send reminder to user ${reminder.userId}:`, err.message);
+  }
+}
+
 const ctx = { config, state, intervalMinutes, refreshGuild };
 
 client.once(Events.ClientReady, async (c) => {
@@ -95,7 +125,15 @@ client.once(Events.ClientReady, async (c) => {
   setInterval(refreshAll, intervalMinutes * 60_000);
   await sendAlerts();
   setInterval(() => sendAlerts().catch((err) => console.error('Alert check failed:', err)), ALERT_CHECK_MS);
+  await sendReminders();
+  setInterval(() => sendReminders().catch((err) => console.error('Reminder check failed:', err)), REMINDER_CHECK_MS);
+  await cleanupTempChannels(c, state);
 });
+
+client.on(Events.VoiceStateUpdate, (oldState, newState) =>
+  onVoiceStateUpdate(oldState, newState, state).catch((err) => console.error('Temporary voice channel failed:', err)),
+);
+client.on(Events.ChannelDelete, (channel) => onChannelDelete(channel, state));
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
