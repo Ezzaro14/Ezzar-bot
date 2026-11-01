@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { Client, Events, GatewayIntentBits, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import { alertMessage, dueAlerts, takeSpawnedPings } from './alerts.js';
-import { handleInteraction } from './commands.js';
+import { handleInteraction, handleMessage } from './commands.js';
 import { reminderMessage } from './reminders.js';
 import { buildBoard } from './render.js';
 import { factionFor, loadState, regionFor, saveState } from './store.js';
@@ -19,7 +19,15 @@ const ALERT_CHECK_MS = 30_000;
 const REMINDER_CHECK_MS = 10_000;
 const config = loadConfig();
 const state = loadState();
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+const client = new Client({
+  // MessageContent (for !RemindMe) is privileged: turn it on in the Developer Portal under Bot.
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
 
 /** Re-renders a guild's posted boards: one group's, or all of them. */
 async function refreshGuild(guildId, groupId) {
@@ -126,18 +134,19 @@ async function sendReminders() {
   await Promise.all(due.map(sendReminder));
 }
 
-/** By DM; if the user doesn't accept DMs from the bot, in the channel the reminder was set in. */
+/** By DM, falling back to the channel it was set in if the user doesn't accept DMs; !RemindMe ones the other way round. */
 async function sendReminder(reminder) {
+  const viaDm = async () => (await client.users.fetch(reminder.userId)).send(reminderMessage(reminder));
+  const viaChannel = async () => (await client.channels.fetch(reminder.channelId)).send(reminderMessage(reminder, { mention: true }));
+  const [first, fallback] = reminder.inChannel ? [viaChannel, viaDm] : [viaDm, viaChannel];
   try {
-    const user = await client.users.fetch(reminder.userId);
-    await user.send(reminderMessage(reminder));
+    await first();
     return;
   } catch (err) {
-    console.warn(`Couldn't DM reminder to user ${reminder.userId}, trying its channel:`, err.message);
+    console.warn(`Couldn't send reminder for user ${reminder.userId}, trying ${reminder.inChannel ? 'DM' : 'its channel'}:`, err.message);
   }
   try {
-    const channel = await client.channels.fetch(reminder.channelId);
-    await channel.send(reminderMessage(reminder, { mention: true }));
+    await fallback();
   } catch (err) {
     console.error(`Failed to send reminder to user ${reminder.userId}:`, err.message);
   }
@@ -160,6 +169,10 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) =>
   onVoiceStateUpdate(oldState, newState, state).catch((err) => console.error('Temporary voice channel failed:', err)),
 );
 client.on(Events.ChannelDelete, (channel) => onChannelDelete(channel, state));
+
+client.on(Events.MessageCreate, (message) =>
+  handleMessage(message, ctx).catch((err) => console.error('Message command failed:', err)),
+);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {

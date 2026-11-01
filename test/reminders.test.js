@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DateTime } from 'luxon';
-import { normalizeZone, parseReminder, reminderMessage, zoneChoices } from '../src/reminders.js';
+import { normalizeZone, parseReminder, prefixReminder, reminderMessage, zoneChoices } from '../src/reminders.js';
 
 const zone = 'Europe/Berlin';
 // Tuesday 2026-10-20 17:00 in Berlin (UTC+2)
@@ -61,4 +61,22 @@ test('reminder message pings only the user, and only in a channel', () => {
   assert.ok(late.content.startsWith('<@42> Reminder'));
   assert.ok(late.content.endsWith(`, was due <t:${now.toSeconds()}:R>`));
   assert.deepEqual(late.allowedMentions, { users: ['42'] });
+});
+
+test('!RemindMe messages: case-insensitive, other messages ignored', () => {
+  assert.equal(prefixReminder('!RemindMe to X in 4 hours'), 'to X in 4 hours');
+  assert.equal(prefixReminder('!remindme in 4 hours'), 'in 4 hours');
+  assert.equal(prefixReminder('!remindmenow in 4 hours'), null);
+  assert.equal(prefixReminder('hey !RemindMe in 4 hours'), null);
+  assert.deepEqual(parse(prefixReminder('!RemindMe to check the raid in 4 hours')), {
+    at: '2026-10-20T21:00:00.000+02:00',
+    text: 'check the raid',
+  });
+});
+
+test('reminders cannot mention @everyone, @here or roles', () => {
+  for (const input of ['to ping @everyone in 4 hours', 'in 4 hours @here raid', 'in 4 hours tell <@&123> to log in', 'in 1 hour @Everyone']) {
+    assert.match(parse(input).error, /@everyone, @here or roles/);
+  }
+  assert.equal(parse('in 4 hours tell <@42> hi').text, 'tell <@42> hi');
 });

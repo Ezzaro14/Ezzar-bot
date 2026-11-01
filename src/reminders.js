@@ -9,6 +9,10 @@ const MAX_DAYS_AHEAD = 365;
 // A reminder sent this late (e.g. the bot was offline) says when it was due.
 const LATE_MS = 60_000;
 
+const MASS_MENTION = /@(everyone|here)\b/i;
+const ROLE_MENTION = /<@&\d+>/;
+const PREFIX_COMMAND = /^!remindme\b\s*/i;
+
 const ts = (ms, style) => `<t:${Math.floor(ms / 1000)}:${style}>`;
 
 const ZONES = ['UTC', ...Intl.supportedValuesOf('timeZone')];
@@ -29,12 +33,21 @@ export function zoneChoices(query, now = DateTime.utc()) {
     .map((zone) => ({ name: `${zone} (${now.setZone(zone).toFormat("'UTC'Z")})`, value: zone }));
 }
 
+/** "!RemindMe to X in 4 hours" -> "to X in 4 hours"; null if the message isn't that command. */
+export function prefixReminder(content) {
+  const match = content.match(PREFIX_COMMAND);
+  return match ? content.slice(match[0].length) : null;
+}
+
 /**
  * Splits "in 12 hours to wash dishes" or "at 2pm tuesday to fix my car" into when and what.
  * zone: the user's time zone, needed only for clock times; relative ones ("in 2 hours") work without it.
  * Returns { at: DateTime, text } or { error } with a message for the user.
  */
 export function parseReminder(input, { now = DateTime.utc(), zone = null } = {}) {
+  if (MASS_MENTION.test(input) || ROLE_MENTION.test(input)) {
+    return { error: "Reminders can't mention @everyone, @here or roles." };
+  }
   const parse = (offset) =>
     chrono.parse(input, { instant: now.toJSDate(), timezone: offset }, { forwardDate: true })[0];
 

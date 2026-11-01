@@ -12,7 +12,7 @@ const STATE_PATH = fileURLToPath(new URL('../data/state.json', import.meta.url))
 //   alertMessages: [{ channelId, messageId, deleteAt }],  (sent pings, deleted once the spawn passes)
 //   tempVoice: { hubId, channels: [channelId] },
 // } },
-//   reminders: [{ id, userId, channelId, at, text, createdAt }],  (at, createdAt: epoch ms)
+//   reminders: [{ id, userId, channelId, at, text, createdAt, inChannel? }],  (at, createdAt: epoch ms; inChannel: set with !RemindMe, sent in its channel)
 //   users: { [userId]: { timezone } } }
 export function loadState() {
   let state;

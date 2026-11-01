@@ -13,7 +13,7 @@ import {
 } from 'discord.js';
 import { DateTime } from 'luxon';
 import { DEFAULT_MINUTES_BEFORE } from './alerts.js';
-import { MAX_REMINDERS, normalizeZone, parseReminder, zoneChoices } from './reminders.js';
+import { MAX_REMINDERS, normalizeZone, parseReminder, prefixReminder, zoneChoices } from './reminders.js';
 import { buildBoard } from './render.js';
 import { factionFor, groupState, guildState, regionFor, saveState } from './store.js';
 import { formatMinutes, parseDuration, shownFor } from './timers.js';
@@ -478,28 +478,43 @@ async function handleTempVoice(interaction, ctx, guild) {
 const userReminders = (ctx, userId) =>
   ctx.state.reminders.filter((r) => r.userId === userId).sort((a, b) => a.at - b.at);
 
-async function handleRemindme(interaction, ctx) {
-  const userId = interaction.user.id;
+/** Parses and saves a reminder; returns it, or { error } with a message for the user. */
+function addReminder(ctx, { userId, channelId, input, inChannel }) {
   if (userReminders(ctx, userId).length >= MAX_REMINDERS) {
-    return interaction.reply(ephemeral(`You have ${MAX_REMINDERS} reminders already. Cancel one with \`/reminders cancel\` first.`));
+    return { error: `You have ${MAX_REMINDERS} reminders already. Cancel one with \`/reminders cancel\` first.` };
   }
-  const zone = ctx.state.users[userId]?.timezone;
-  const parsed = parseReminder(interaction.options.getString('reminder'), { zone });
-  if (parsed.error) return interaction.reply(ephemeral(parsed.error));
-
-  const at = parsed.at.toMillis();
-  ctx.state.reminders.push({
-    id: randomUUID(),
-    userId,
-    channelId: interaction.channelId,
-    at,
-    text: parsed.text,
-    createdAt: Date.now(),
-  });
+  const parsed = parseReminder(input, { zone: ctx.state.users[userId]?.timezone });
+  if (parsed.error) return parsed;
+  const reminder = { id: randomUUID(), userId, channelId, at: parsed.at.toMillis(), text: parsed.text, createdAt: Date.now() };
+  // Set with !RemindMe: sent in its channel instead of by DM.
+  if (inChannel) reminder.inChannel = true;
+  ctx.state.reminders.push(reminder);
   saveState(ctx.state);
-  const what = parsed.text ? `: **${parsed.text}**` : '.';
-  const when = `<t:${Math.floor(at / 1000)}:F> (<t:${Math.floor(at / 1000)}:R>)`;
+  return reminder;
+}
+
+async function handleRemindme(interaction, ctx) {
+  const reminder = addReminder(ctx, {
+    userId: interaction.user.id,
+    channelId: interaction.channelId,
+    input: interaction.options.getString('reminder'),
+  });
+  if (reminder.error) return interaction.reply(ephemeral(reminder.error));
+  const what = reminder.text ? `: **${reminder.text}**` : '.';
+  const when = `<t:${Math.floor(reminder.at / 1000)}:F> (<t:${Math.floor(reminder.at / 1000)}:R>)`;
   return interaction.reply(ephemeral(`I'll DM you ${when}${what}`));
+}
+
+/** "!RemindMe to X in 4 hours" in a server channel: the reminder is sent in that channel. */
+export async function handleMessage(message, ctx) {
+  if (message.author.bot || !message.inGuild()) return;
+  const input = prefixReminder(message.content);
+  if (input === null) return;
+  const reminder = addReminder(ctx, { userId: message.author.id, channelId: message.channelId, input, inChannel: true });
+  const content = reminder.error
+    ? reminder.error
+    : `Ok, I'll remind you <t:${Math.floor(reminder.at / 1000)}:R>${reminder.text ? `: **${reminder.text}**` : '.'}`;
+  return message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
 }
 
 async function handleReminders(interaction, ctx) {

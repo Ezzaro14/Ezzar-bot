@@ -66,17 +66,22 @@ The role must allow @mentions (Server Settings → Roles → Allow anyone to @me
 ## Reminders
 
 Personal reminders, sent to you by DM (or in the channel you set them in, if your DMs are closed).
+Or type `!RemindMe to X in 4 hours` in a server channel to get the reminder in that channel instead.
+Reminders can't mention @everyone, @here or roles.
 
 | Command | What |
 | --- | --- |
 | `/remindme in 12 hours to wash dishes` | Remind you in 12 hours |
 | `/remindme at 2pm tuesday to fix my car` | Remind you at a clock time |
+| `!RemindMe to check the raid in 4 hours` | Remind you in this channel (type it as a message) |
 | `/reminders list` | Show your reminders |
 | `/reminders cancel` | Cancel one |
 | `/reminders timezone Europe/Berlin` | Set your time zone |
 
 Clock times like "at 2pm" need your time zone, so set it once with `/reminders timezone`.
 Relative times like "in 12 hours" work without it. Up to 25 reminders, at most a year ahead.
+
+`!RemindMe` needs the **Message Content Intent**: Developer Portal → your app → Bot → turn it on.
 
 ## Temporary voice channels
 
