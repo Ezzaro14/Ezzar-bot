@@ -84,6 +84,20 @@ function reminderText(input, match) {
     .replace(/[\s,:;-]+$/, '');
 }
 
+/** A duration in words, its two largest units: "4 hours", "1 hour 30 minutes", "2 days 3 hours". */
+export function formatDuration(ms) {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  return [
+    [Math.floor(minutes / 1440), 'day'],
+    [Math.floor(minutes / 60) % 24, 'hour'],
+    [minutes % 60, 'minute'],
+  ]
+    .filter(([n]) => n)
+    .slice(0, 2)
+    .map(([n, unit]) => `${n} ${unit}${n === 1 ? '' : 's'}`)
+    .join(' ');
+}
+
 /** The reminder as a message; in a channel it pings the user, and its text never pings anyone. */
 export function reminderMessage(reminder, { mention = false, now = Date.now() } = {}) {
   const text = reminder.text ? `Reminder: **${reminder.text}**` : 'Reminder';

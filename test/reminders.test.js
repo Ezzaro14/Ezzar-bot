@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DateTime } from 'luxon';
-import { normalizeZone, parseReminder, prefixReminder, reminderMessage, zoneChoices } from '../src/reminders.js';
+import { formatDuration, normalizeZone, parseReminder, prefixReminder, reminderMessage, zoneChoices } from '../src/reminders.js';
 
 const zone = 'Europe/Berlin';
 // Tuesday 2026-10-20 17:00 in Berlin (UTC+2)
@@ -79,4 +79,14 @@ test('reminders cannot mention @everyone, @here or roles', () => {
     assert.match(parse(input).error, /@everyone, @here or roles/);
   }
   assert.equal(parse('in 4 hours tell <@42> hi').text, 'tell <@42> hi');
+});
+
+test('durations in words, two largest units', () => {
+  const minutes = (n) => n * 60_000;
+  assert.equal(formatDuration(minutes(240) - 50), '4 hours');
+  assert.equal(formatDuration(minutes(90)), '1 hour 30 minutes');
+  assert.equal(formatDuration(minutes(1)), '1 minute');
+  assert.equal(formatDuration(minutes(1440 + 180 + 5)), '1 day 3 hours');
+  assert.equal(formatDuration(minutes(2 * 1440 + 5)), '2 days 5 minutes');
+  assert.equal(formatDuration(1000), '1 minute');
 });

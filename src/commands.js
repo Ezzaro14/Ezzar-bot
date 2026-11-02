@@ -14,7 +14,7 @@ import {
 } from 'discord.js';
 import { DateTime } from 'luxon';
 import { DEFAULT_MINUTES_BEFORE } from './alerts.js';
-import { MAX_REMINDERS, normalizeZone, parseReminder, prefixReminder, zoneChoices } from './reminders.js';
+import { MAX_REMINDERS, formatDuration, normalizeZone, parseReminder, prefixReminder, zoneChoices } from './reminders.js';
 import { buildBoard } from './render.js';
 import { factionFor, groupState, guildState, regionFor, saveState } from './store.js';
 import { formatMinutes, parseDuration, shownFor } from './timers.js';
@@ -514,7 +514,7 @@ export async function handleMessage(message, ctx) {
   const reminder = addReminder(ctx, { userId: message.author.id, channelId: message.channelId, input, inChannel: true });
   const content = reminder.error
     ? reminder.error
-    : `Ok, I'll remind you <t:${Math.floor(reminder.at / 1000)}:R>${reminder.text ? `: **${reminder.text}**` : '.'}`;
+    : `Ok, I'll remind you in ${formatDuration(reminder.at - Date.now())}${reminder.text ? `: **${reminder.text}**` : '.'}`;
   try {
     return await message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
   } catch (err) {
