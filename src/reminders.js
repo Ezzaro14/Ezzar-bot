@@ -84,9 +84,11 @@ function reminderText(input, match) {
     .replace(/[\s,:;-]+$/, '');
 }
 
-/** A duration in words, its two largest units: "4 hours", "1 hour 30 minutes", "2 days 3 hours". */
+/** A duration in words, its two largest units: "4 hours", "1 hour 30 minutes", "2 days 3 hours"; under a minute, "5 seconds". */
 export function formatDuration(ms) {
-  const minutes = Math.max(1, Math.round(ms / 60_000));
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  const minutes = Math.round(ms / 60_000);
   return [
     [Math.floor(minutes / 1440), 'day'],
     [Math.floor(minutes / 60) % 24, 'hour'],

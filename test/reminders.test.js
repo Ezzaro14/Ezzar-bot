@@ -88,5 +88,8 @@ test('durations in words, two largest units', () => {
   assert.equal(formatDuration(minutes(1)), '1 minute');
   assert.equal(formatDuration(minutes(1440 + 180 + 5)), '1 day 3 hours');
   assert.equal(formatDuration(minutes(2 * 1440 + 5)), '2 days 5 minutes');
-  assert.equal(formatDuration(1000), '1 minute');
+  assert.equal(formatDuration(5000 - 20), '5 seconds');
+  assert.equal(formatDuration(1000), '1 second');
+  assert.equal(formatDuration(59_000), '59 seconds');
+  assert.equal(formatDuration(minutes(1) - 200), '1 minute');
 });
