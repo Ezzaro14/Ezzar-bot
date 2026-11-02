@@ -9,6 +9,7 @@ import {
   MessageFlags,
   OAuth2Scopes,
   PermissionFlagsBits,
+  RESTJSONErrorCodes,
   SlashCommandBuilder,
 } from 'discord.js';
 import { DateTime } from 'luxon';
@@ -514,7 +515,13 @@ export async function handleMessage(message, ctx) {
   const content = reminder.error
     ? reminder.error
     : `Ok, I'll remind you <t:${Math.floor(reminder.at / 1000)}:R>${reminder.text ? `: **${reminder.text}**` : '.'}`;
-  return message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
+  try {
+    return await message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
+  } catch (err) {
+    // Replying needs Read Message History, which the bot may not have; a plain message doesn't.
+    if (err.code !== RESTJSONErrorCodes.CannotReplyWithoutPermissionToReadMessageHistory) throw err;
+    return message.channel.send({ content: `<@${message.author.id}> ${content}`, allowedMentions: { parse: [] } });
+  }
 }
 
 async function handleReminders(interaction, ctx) {
